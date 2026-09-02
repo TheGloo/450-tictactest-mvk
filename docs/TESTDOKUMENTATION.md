@@ -49,6 +49,29 @@ Ausführen der Tests:
 
 Gesamter Test-Ordner: <https://github.com/TheGloo/450-tictactest-mvk/tree/main/src/test/java/ch/bbw/m450/tictactoe>
 
+### Test-Helper und Fixtures
+
+Damit die Tests selbst nur noch das Szenario beschreiben, liegen Testdaten, Test-Doubles
+und eigene Assertions im Paket
+[`testsupport`](https://github.com/TheGloo/450-tictactest-mvk/tree/main/src/test/java/ch/bbw/m450/tictactoe/testsupport):
+
+| Klasse | Art | Aufgabe |
+|---|---|---|
+| [`Boards`](https://github.com/TheGloo/450-tictactest-mvk/blob/main/src/test/java/ch/bbw/m450/tictactoe/testsupport/Boards.java) | Fixture + Helper | Konstanten `EMPTY` und `DRAW`, der Builder `board(String)` (9-Zeichen-Muster → `Stone[]`), `render(…)` für lesbare Fehlermeldungen und `winningLinesForCross()` als Datenquelle für den parametrisierten Test |
+| [`TestPlayers`](https://github.com/TheGloo/450-tictactest-mvk/blob/main/src/test/java/ch/bbw/m450/tictactoe/testsupport/TestPlayers.java) | Test-Doubles | `greedy()` und `alwaysPlayingTo(int)` — ein berechenbarer bzw. ein „schummelnder" Gegner. Nötig, weil `HumanPlayer` von stdin liest und im Test unbrauchbar ist |
+| [`BoardAssert`](https://github.com/TheGloo/450-tictactest-mvk/blob/main/src/test/java/ch/bbw/m450/tictactoe/testsupport/BoardAssert.java) | eigene AssertJ-Assertion | `assertThatBoard(…).isWonBy(CROSS)` / `.hasNoWinner()`; bei einem Fehlschlag wird das betroffene Brett mit ausgegeben |
+| [`ConsoleCapture`](https://github.com/TheGloo/450-tictactest-mvk/blob/main/src/test/java/ch/bbw/m450/tictactoe/testsupport/ConsoleCapture.java) | JUnit-5-Fixture (Extension) | Leitet `System.out` pro Test um und stellt es danach wieder her. Hält die Brett-Ausgaben von `play(…)` aus der Build-Ausgabe heraus und macht sie für Assertions verfügbar |
+
+Beispiel für eine Fehlermeldung von `BoardAssert`:
+
+```
+expected CROSS to have three in a line on board:
+
+XX.
+...
+...
+```
+
 ---
 
 ## 3. Dummy-Tests (Setup-Nachweis)
@@ -97,8 +120,10 @@ assertThat(true).as("if this test runs at all, AssertJ is on the classpath")
 
 Quelle: [`TicTacToeMainTest.java`](https://github.com/TheGloo/450-tictactest-mvk/blob/main/src/test/java/ch/bbw/m450/tictactoe/TicTacToeMainTest.java)
 
-Alle Tests benutzen die Hilfsmethode `board(String pattern)`, die ein Spielfeld aus
-einem 9-Zeichen-Muster baut (`X` = Kreuz, `O` = Kreis, alles andere = leeres Feld).
+Die Tests sind mit `@Nested` nach der getesteten Methode gruppiert (`isWin` und `play`),
+damit die Testausgabe die Struktur der Klasse widerspiegelt. Die Spielfelder kommen aus
+`Boards` und werden über die Hilfsmethode `Boards.board(String pattern)` aus einem
+9-Zeichen-Muster gebaut (`X` = Kreuz, `O` = Kreis, alles andere = leeres Feld).
 Das Brett ist ein eindimensionales Array der Länge 9:
 
 ```
@@ -109,57 +134,57 @@ Das Brett ist ein eindimensionales Array der Länge 9:
  6 | 7 | 8
 ```
 
-### T1 – `isWinDetectsEveryWinningLine(String pattern)`
+### T1 – `IsWin.detectsEveryWinningLine(String line, String pattern)`
 
-*"isWin detects all three rows, columns and diagonals"* — [Zeile 31–40](https://github.com/TheGloo/450-tictactest-mvk/blob/main/src/test/java/ch/bbw/m450/tictactoe/TicTacToeMainTest.java#L31-L40)
+*"TicTacToeMain > isWin > detects all three rows, columns and diagonals"* — [Zeile 32–37](https://github.com/TheGloo/450-tictactest-mvk/blob/main/src/test/java/ch/bbw/m450/tictactoe/TicTacToeMainTest.java#L32-L37)
 
 Parametrisierter Test mit 8 Durchläufen (3 Reihen, 3 Spalten, 2 Diagonalen).
 
 | | |
 |---|---|
-| **GIVEN** | Ein Spielfeld, auf dem `CROSS` genau eine der 8 möglichen Gewinnlinien besetzt (z.B. `"XXX......"` für die obere Reihe oder `"X...X...X"` für die Hauptdiagonale). |
-| **WHEN** | `TicTacToeMain.isWin(board, Stone.CROSS)` bzw. `isWin(board, Stone.CIRCLE)` aufgerufen wird. |
-| **THEN** | Für `CROSS` liefert die Methode `true` (die Gewinnlinie wird erkannt), für `CIRCLE` liefert sie `false` (es wird kein falscher Gewinner gemeldet). |
+| **GIVEN** | Ein Spielfeld aus der Fixture `Boards.winningLinesForCross()`, auf dem `CROSS` genau eine der 8 möglichen Gewinnlinien besetzt — je einmal pro Reihe, Spalte und Diagonale, jeweils mit dem Namen der Linie als Testtitel. |
+| **WHEN** | Das Brett mit `assertThatBoard(pattern).isWonBy(Stone.CROSS)` geprüft wird. Die Assertion ruft intern `TicTacToeMain.isWin` für beide Farben auf. |
+| **THEN** | Für `CROSS` liefert `isWin` `true` (die Gewinnlinie wird erkannt), für `CIRCLE` liefert sie `false` (es wird kein falscher Gewinner gemeldet). |
 
 **Warum dieser Test?** `isWin` besteht aus 8 hart kodierten Bedingungen. Ein Tippfehler in
 einem einzigen Index würde eine Gewinnlinie unerkannt lassen. Der Test deckt jede Linie
 einzeln ab.
 
-### T2 – `isWinIsFalseWithoutThreeInALine()`
+### T2 – `IsWin.isFalseWithoutThreeInALine()`
 
-*"isWin is false for an empty board and for a full board without a line"* — [Zeile 42–53](https://github.com/TheGloo/450-tictactest-mvk/blob/main/src/test/java/ch/bbw/m450/tictactoe/TicTacToeMainTest.java#L42-L53)
+*"TicTacToeMain > isWin > is false for an empty board and for a full board without a line"* — [Zeile 39–43](https://github.com/TheGloo/450-tictactest-mvk/blob/main/src/test/java/ch/bbw/m450/tictactoe/TicTacToeMainTest.java#L39-L43)
 
 | | |
 |---|---|
-| **GIVEN** | Zwei Spielfelder ohne Gewinnlinie: (a) ein komplett leeres Brett `"........."`, (b) ein volles Unentschieden-Brett `"XOXXOOOXX"`. |
-| **WHEN** | `isWin` für beide Farben (`CROSS` und `CIRCLE`) aufgerufen wird. |
+| **GIVEN** | Zwei Spielfelder ohne Gewinnlinie aus den Fixtures `Boards.EMPTY` (`"........."`) und `Boards.DRAW` (`"XOXXOOOXX"`). |
+| **WHEN** | Beide Bretter mit `assertThatBoard(…).hasNoWinner()` geprüft werden, was `isWin` für `CROSS` und `CIRCLE` aufruft. |
 | **THEN** | Alle Aufrufe liefern `false` — es wird kein Gewinner gemeldet, wo keiner ist. |
 
 **Warum dieser Test?** Das leere Brett ist der wichtigste Grenzfall: Alle Felder sind `null`.
 Ohne die vorgelagerte `b[x] == color`-Prüfung würde `null == null == null` fälschlicherweise
 als Gewinn gelten. Der Test sichert diesen Negativfall ab.
 
-### T3 – `twoGreedyPlayersLetCrossWin()`
+### T3 – `Play.twoGreedyPlayersLetCrossWin()`
 
-*"two greedy players fill the board left to right, so CROSS wins on 2-4-6"* — [Zeile 55–61](https://github.com/TheGloo/450-tictactest-mvk/blob/main/src/test/java/ch/bbw/m450/tictactoe/TicTacToeMainTest.java#L55-L61)
+*"TicTacToeMain > play > lets CROSS win on 2-4-6 when two greedy players meet"* — [Zeile 55–63](https://github.com/TheGloo/450-tictactest-mvk/blob/main/src/test/java/ch/bbw/m450/tictactoe/TicTacToeMainTest.java#L55-L63)
 
 | | |
 |---|---|
-| **GIVEN** | Zwei unabhängige `GreedyPlayer`-Instanzen. Der `GreedyPlayer` setzt immer auf das erste freie Feld von oben links. |
-| **WHEN** | Eine komplette Partie mit `TicTacToeMain.play(greedy1, greedy2)` gespielt wird. Die Züge sind deterministisch: X→0, O→1, X→2, O→3, X→4, O→5, X→6. |
-| **THEN** | Die Methode gibt `Stone.CROSS` zurück, denn `CROSS` besetzt nach dem 7. Zug die Nebendiagonale 2-4-6 und gewinnt. |
+| **GIVEN** | Zwei unabhängige `GreedyPlayer`-Instanzen aus `TestPlayers.greedy()`; der `GreedyPlayer` setzt immer auf das erste freie Feld von oben links. Die Fixture `ConsoleCapture` fängt `System.out` für die Dauer des Tests ab. |
+| **WHEN** | Eine komplette Partie mit `TicTacToeMain.play(greedy(), greedy())` gespielt wird. Die Züge sind deterministisch: X→0, O→1, X→2, O→3, X→4, O→5, X→6. |
+| **THEN** | Die Methode gibt `Stone.CROSS` zurück, denn `CROSS` besetzt nach dem 7. Zug die Nebendiagonale 2-4-6 und gewinnt — und die abgefangene Konsolenausgabe enthält `"...and the winner is: CROSS"`. |
 
 **Warum dieser Test?** Dies ist der Happy-Path-Integrationstest: Er prüft die komplette
 Spielschleife — Zugreihenfolge, Farbwechsel, Gewinnerkennung und Rückgabewert — in einem
 vollständig deterministischen Szenario.
 
-### T4 – `playRejectsTheSamePlayerTwice()`
+### T4 – `Play.rejectsTheSamePlayerTwice()`
 
-*"play refuses to run a player against itself"* — [Zeile 63–69](https://github.com/TheGloo/450-tictactest-mvk/blob/main/src/test/java/ch/bbw/m450/tictactoe/TicTacToeMainTest.java#L63-L69)
+*"TicTacToeMain > play > refuses to run a player against itself"* — [Zeile 64–70](https://github.com/TheGloo/450-tictactest-mvk/blob/main/src/test/java/ch/bbw/m450/tictactoe/TicTacToeMainTest.java#L64-L70)
 
 | | |
 |---|---|
-| **GIVEN** | Eine einzige `GreedyPlayer`-Instanz, die als beide Spieler übergeben werden soll. |
+| **GIVEN** | Eine einzige `TestPlayers.greedy()`-Instanz, die als beide Spieler übergeben werden soll. |
 | **WHEN** | `TicTacToeMain.play(player, player)` mit derselben Referenz für X und O aufgerufen wird. |
 | **THEN** | Es wird eine `IllegalArgumentException` mit der Nachricht `"players must differ"` geworfen; das Spiel startet gar nicht erst. |
 
@@ -167,15 +192,15 @@ vollständig deterministischen Szenario.
 Referenzvergleich (`currentPlayer == xPlayer`). Wäre es dieselbe Instanz, würde die
 Farbzuordnung brechen. Der Test sichert diese Vorbedingung ab.
 
-### T5 – `playRejectsInvalidMoves(int position)`
+### T5 – `Play.rejectsInvalidMoves(int position)`
 
-*"play rejects moves outside the board and onto occupied fields"* — [Zeile 71–79](https://github.com/TheGloo/450-tictactest-mvk/blob/main/src/test/java/ch/bbw/m450/tictactoe/TicTacToeMainTest.java#L71-L79)
+*"TicTacToeMain > play > rejects moves outside the board and onto occupied fields"* — [Zeile 72–80](https://github.com/TheGloo/450-tictactest-mvk/blob/main/src/test/java/ch/bbw/m450/tictactoe/TicTacToeMainTest.java#L72-L80)
 
 Parametrisierter Test mit 3 Durchläufen: `-1`, `9` und `0`.
 
 | | |
 |---|---|
-| **GIVEN** | Ein regulärer `GreedyPlayer` als X und ein "schummelnder" Spieler als O (Lambda), der immer auf die ungültige Position `position` setzt. X eröffnet auf Feld `0`. |
+| **GIVEN** | Ein regulärer `TestPlayers.greedy()` als X und `TestPlayers.alwaysPlayingTo(position)` als „schummelnder" O, der immer auf die ungültige Position `position` setzt. X eröffnet auf Feld `0`. |
 | **WHEN** | `TicTacToeMain.play(greedy, cheater)` gespielt wird und der Schummler seinen Zug macht — mit `-1` (unterhalb des Bretts), `9` (oberhalb des Bretts) oder `0` (bereits von X belegt). |
 | **THEN** | Es wird eine `IllegalStateException` mit der Nachricht `"cannot play to position <position>"` geworfen. |
 
@@ -202,20 +227,21 @@ mit 8 bzw. 3 Durchläufen).
 DummySetupTest > AssertJ assertions are available and run PASSED
 DummySetupTest > JUnit 5 assertions are available and run PASSED
 
-TicTacToeMainTest > play rejects moves outside the board and onto occupied fields > playing to position -1 is rejected PASSED
-TicTacToeMainTest > play rejects moves outside the board and onto occupied fields > playing to position 9 is rejected PASSED
-TicTacToeMainTest > play rejects moves outside the board and onto occupied fields > playing to position 0 is rejected PASSED
-TicTacToeMainTest > play refuses to run a player against itself PASSED
-TicTacToeMainTest > isWin is false for an empty board and for a full board without a line PASSED
-TicTacToeMainTest > isWin detects all three rows, columns and diagonals > board "XXX......" is a win for CROSS PASSED
-TicTacToeMainTest > isWin detects all three rows, columns and diagonals > board "...XXX..." is a win for CROSS PASSED
-TicTacToeMainTest > isWin detects all three rows, columns and diagonals > board "......XXX" is a win for CROSS PASSED
-TicTacToeMainTest > isWin detects all three rows, columns and diagonals > board "X..X..X.." is a win for CROSS PASSED
-TicTacToeMainTest > isWin detects all three rows, columns and diagonals > board ".X..X..X." is a win for CROSS PASSED
-TicTacToeMainTest > isWin detects all three rows, columns and diagonals > board "..X..X..X" is a win for CROSS PASSED
-TicTacToeMainTest > isWin detects all three rows, columns and diagonals > board "X...X...X" is a win for CROSS PASSED
-TicTacToeMainTest > isWin detects all three rows, columns and diagonals > board "..X.X.X.." is a win for CROSS PASSED
-TicTacToeMainTest > two greedy players fill the board left to right, so CROSS wins on 2-4-6 PASSED
+TicTacToeMain > play > rejects moves outside the board and onto occupied fields > playing to position -1 is rejected PASSED
+TicTacToeMain > play > rejects moves outside the board and onto occupied fields > playing to position 9 is rejected PASSED
+TicTacToeMain > play > rejects moves outside the board and onto occupied fields > playing to position 0 is rejected PASSED
+TicTacToeMain > play > lets CROSS win on 2-4-6 when two greedy players meet PASSED
+TicTacToeMain > play > refuses to run a player against itself PASSED
+
+TicTacToeMain > isWin > detects all three rows, columns and diagonals > top row PASSED
+TicTacToeMain > isWin > detects all three rows, columns and diagonals > middle row PASSED
+TicTacToeMain > isWin > detects all three rows, columns and diagonals > bottom row PASSED
+TicTacToeMain > isWin > detects all three rows, columns and diagonals > left column PASSED
+TicTacToeMain > isWin > detects all three rows, columns and diagonals > middle column PASSED
+TicTacToeMain > isWin > detects all three rows, columns and diagonals > right column PASSED
+TicTacToeMain > isWin > detects all three rows, columns and diagonals > main diagonal PASSED
+TicTacToeMain > isWin > detects all three rows, columns and diagonals > anti diagonal PASSED
+TicTacToeMain > isWin > is false for an empty board and for a full board without a line PASSED
 
 BUILD SUCCESSFUL in 2s
 3 actionable tasks: 3 executed
@@ -244,14 +270,14 @@ Der Build bricht mit `Task :test FAILED` ab, die übrigen 15 Tests laufen weiter
 ```
 > Task :test FAILED
 
+TicTacToeMain > play > rejects moves outside the board and onto occupied fields > playing to position -1 is rejected PASSED
+...
+TicTacToeMain > isWin > is false for an empty board and for a full board without a line PASSED
+
 DummySetupTest > AssertJ assertions are available and run PASSED
 
 DummySetupTest > JUnit 5 assertions are available and run FAILED
     org.opentest4j.AssertionFailedError at DummySetupTest.java:18
-
-TicTacToeMainTest > play rejects moves outside the board and onto occupied fields > playing to position -1 is rejected PASSED
-...
-TicTacToeMainTest > two greedy players fill the board left to right, so CROSS wins on 2-4-6 PASSED
 
 16 tests completed, 1 failed
 
@@ -259,7 +285,7 @@ FAILURE: Build failed with an exception.
 
 * What went wrong:
 Execution failed for task ':test'.
-> There were failing tests.
+> There were failing tests. See the report at: file:///C:/codingProjects/450-tictactest-mvk/build/reports/tests/test/index.html
 ```
 
 Die vollständige Fehlermeldung
