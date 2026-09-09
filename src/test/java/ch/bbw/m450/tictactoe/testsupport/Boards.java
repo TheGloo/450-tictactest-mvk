@@ -1,5 +1,6 @@
 package ch.bbw.m450.tictactoe.testsupport;
 
+import java.util.List;
 import java.util.stream.Stream;
 
 import ch.bbw.m450.tictactoe.TicTacToeMain;
@@ -33,6 +34,25 @@ public final class Boards {
 	 * </pre>
 	 */
 	public static final String DRAW = "XOXXOOOXX";
+
+	/**
+	 * The moves CROSS plays to fill {@link #DRAW}, in turn order. Neither colour ever holds
+	 * three in a line, not even intermediately, so the game runs the full nine rounds.
+	 */
+	public static final int[] DRAW_MOVES_CROSS = {0, 2, 3, 7, 8};
+
+	/** The moves CIRCLE plays to fill {@link #DRAW}, interleaved with {@link #DRAW_MOVES_CROSS}. */
+	public static final int[] DRAW_MOVES_CIRCLE = {1, 4, 5, 6};
+
+	/** The eight winning lines, written for CROSS and named after the line they occupy. */
+	private static final List<Arguments> LINES = List.of(Arguments.of("top row", "XXX......"),
+			Arguments.of("middle row", "...XXX..."),
+			Arguments.of("bottom row", "......XXX"),
+			Arguments.of("left column", "X..X..X.."),
+			Arguments.of("middle column", ".X..X..X."),
+			Arguments.of("right column", "..X..X..X"),
+			Arguments.of("main diagonal", "X...X...X"),
+			Arguments.of("anti diagonal", "..X.X.X.."));
 
 	private Boards() {
 	}
@@ -77,17 +97,39 @@ public final class Boards {
 	}
 
 	/**
-	 * Fixture for a parameterized test: the eight boards on which CROSS holds a winning
-	 * line — one per row, column and diagonal — each paired with the name of that line.
+	 * Fixture for a parameterized test: all sixteen boards on which one colour holds a
+	 * winning line — the eight rows, columns and diagonals, once for CROSS and once for
+	 * CIRCLE — as {@code (colour, line name, pattern)}.
+	 *
+	 * <p>Deriving the CIRCLE boards from the CROSS ones keeps the eight line patterns in a
+	 * single place, so a corrected line stays correct for both colours.
 	 */
-	public static Stream<Arguments> winningLinesForCross() {
-		return Stream.of(Arguments.of("top row", "XXX......"),
-				Arguments.of("middle row", "...XXX..."),
-				Arguments.of("bottom row", "......XXX"),
-				Arguments.of("left column", "X..X..X.."),
-				Arguments.of("middle column", ".X..X..X."),
-				Arguments.of("right column", "..X..X..X"),
-				Arguments.of("main diagonal", "X...X...X"),
-				Arguments.of("anti diagonal", "..X.X.X.."));
+	public static Stream<Arguments> winningLines() {
+		return Stream.of(Stone.CROSS, Stone.CIRCLE)
+				.flatMap(color -> LINES.stream()
+						.map(line -> Arguments.of(color, line.get()[0], recolor((String) line.get()[1], color))));
+	}
+
+	/**
+	 * Fixture for a parameterized test: boards on which neither colour has three in a line.
+	 * Covers the empty board, two full boards and the near misses that a naive win check
+	 * would most likely get wrong — a line one stone short, and lines blocked by the opponent.
+	 */
+	public static Stream<Arguments> boardsWithoutWinner() {
+		return Stream.of(Arguments.of("empty board", EMPTY),
+				Arguments.of("full board ending in a draw", DRAW),
+				Arguments.of("full board without a line", "XOXOXOOXO"),
+				Arguments.of("two in a row, third field still free", "XX......."),
+				Arguments.of("row blocked by the opponent", "XXO......"),
+				Arguments.of("column blocked by the opponent", "X..X..O.."),
+				Arguments.of("main diagonal blocked by the opponent", "X...X...O"),
+				Arguments.of("anti diagonal blocked by the opponent", "..X.X.O.."),
+				Arguments.of("three stones of one colour, but not in a line", "XX...X..."),
+				Arguments.of("both colours two in a row", "XXOOO...."));
+	}
+
+	/** Rewrites a CROSS pattern for the given colour. */
+	private static String recolor(String pattern, Stone color) {
+		return color == Stone.CROSS ? pattern : pattern.replace('X', 'O');
 	}
 }
