@@ -9,22 +9,24 @@ on:
 
 permissions:
   contents: read
+  packages: read
 
 jobs:
   build:
     name: Build & Test
     runs-on: ubuntu-latest
 
+    # Run every step inside our own image from the GitHub Container Registry.
+    # It already provides Zulu 25 (the pinned daemon JVM) and the Gradle
+    # distribution, so there is no "Set up JDK" step anymore.
+    container:
+      image: ghcr.io/thegloo/450-tictactest-mvk:latest
+      credentials:
+        username: ${{ github.actor }}
+        password: ${{ secrets.GITHUB_TOKEN }}
+
     steps:
       - uses: actions/checkout@v4
-
-      # Zulu 25 matches the daemon JVM pinned in gradle/gradle-daemon-jvm.properties,
-      # so Gradle reuses this JDK instead of downloading its own.
-      - name: Set up JDK 25 (Zulu)
-        uses: actions/setup-java@v4
-        with:
-          distribution: zulu
-          java-version: '25'
 
       - name: Set up Gradle
         uses: gradle/actions/setup-gradle@v4
