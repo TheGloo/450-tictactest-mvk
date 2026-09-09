@@ -1,5 +1,8 @@
 package ch.bbw.m450.tictactoe.testsupport;
 
+import java.util.NoSuchElementException;
+import java.util.concurrent.atomic.AtomicInteger;
+
 import ch.bbw.m450.tictactoe.TicTacToePlayer;
 import ch.bbw.m450.tictactoe.players.GreedyPlayer;
 
@@ -27,5 +30,24 @@ public final class TestPlayers {
 	 */
 	public static TicTacToePlayer alwaysPlayingTo(int position) {
 		return (board, colorToPlay) -> position;
+	}
+
+	/**
+	 * A player that plays a scripted list of positions in order, ignoring the board. Lets a
+	 * test steer a game into an exact final position, such as a draw.
+	 *
+	 * @throws NoSuchElementException if the game asks for more moves than were scripted,
+	 * 		which means the test's expectation about the game length was wrong
+	 */
+	public static TicTacToePlayer playingSequence(int... positions) {
+		var next = new AtomicInteger();
+		return (board, colorToPlay) -> {
+			var move = next.getAndIncrement();
+			if (move >= positions.length) {
+				throw new NoSuchElementException(
+						"the scripted player ran out of moves after " + positions.length + " turns");
+			}
+			return positions[move];
+		};
 	}
 }
