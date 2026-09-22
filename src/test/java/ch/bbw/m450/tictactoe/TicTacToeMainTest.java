@@ -2,9 +2,11 @@ package ch.bbw.m450.tictactoe;
 
 import static ch.bbw.m450.tictactoe.testsupport.BoardAssert.assertThatBoard;
 import static ch.bbw.m450.tictactoe.testsupport.Boards.DRAW;
-import static ch.bbw.m450.tictactoe.testsupport.Boards.EMPTY;
+import static ch.bbw.m450.tictactoe.testsupport.Boards.DRAW_MOVES_CIRCLE;
+import static ch.bbw.m450.tictactoe.testsupport.Boards.DRAW_MOVES_CROSS;
 import static ch.bbw.m450.tictactoe.testsupport.TestPlayers.alwaysPlayingTo;
 import static ch.bbw.m450.tictactoe.testsupport.TestPlayers.greedy;
+import static ch.bbw.m450.tictactoe.testsupport.TestPlayers.playingSequence;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
@@ -29,18 +31,18 @@ class TicTacToeMainTest {
 	@DisplayName("isWin")
 	class IsWin {
 
-		@ParameterizedTest(name = "{0}")
-		@DisplayName("detects all three rows, columns and diagonals")
-		@MethodSource("ch.bbw.m450.tictactoe.testsupport.Boards#winningLinesForCross")
-		void detectsEveryWinningLine(String line, String pattern) {
-			assertThatBoard(pattern).isWonBy(Stone.CROSS);
+		@ParameterizedTest(name = "{0} wins on the {1}")
+		@DisplayName("detects every winning line for both colours")
+		@MethodSource("ch.bbw.m450.tictactoe.testsupport.Boards#winningLines")
+		void detectsEveryWinningLine(Stone color, String line, String pattern) {
+			assertThatBoard(pattern).isWonBy(color);
 		}
 
-		@Test
-		@DisplayName("is false for an empty board and for a full board without a line")
-		void isFalseWithoutThreeInALine() {
-			assertThatBoard(EMPTY).hasNoWinner();
-			assertThatBoard(DRAW).hasNoWinner();
+		@ParameterizedTest(name = "{0}")
+		@DisplayName("reports no winner on boards without three in a line")
+		@MethodSource("ch.bbw.m450.tictactoe.testsupport.Boards#boardsWithoutWinner")
+		void isFalseWithoutThreeInALine(String constellation, String pattern) {
+			assertThatBoard(pattern).hasNoWinner();
 		}
 	}
 
@@ -59,6 +61,17 @@ class TicTacToeMainTest {
 			// X:0 O:1 X:2 O:3 X:4 O:5 X:6 -> CROSS holds the anti-diagonal 2-4-6
 			assertThat(TicTacToeMain.play(greedy(), greedy())).isEqualTo(Stone.CROSS);
 			assertThat(console.output()).contains("...and the winner is: " + Stone.CROSS);
+		}
+
+		@Test
+		@DisplayName("returns null and reports a draw when all nine fields are filled")
+		void fullBoardWithoutALineIsADraw() {
+			// scripted so the board ends up as Boards.DRAW without either colour ever
+			// holding three in a line, which is the only way to reach round nine
+			assertThat(TicTacToeMain.play(playingSequence(DRAW_MOVES_CROSS), playingSequence(DRAW_MOVES_CIRCLE)))
+					.isNull();
+			assertThat(console.output()).contains("it's a draw!");
+			assertThatBoard(DRAW).hasNoWinner();
 		}
 
 		@Test
