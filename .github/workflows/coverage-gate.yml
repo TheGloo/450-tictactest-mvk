@@ -1,0 +1,140 @@
+name: Coverage Gate
+
+# Quality gate: a branch must not have a lower test coverage (line coverage,
+# JaCoCo) than the current main branch.
+#
+#   main:     76.40 %
+#   Branch:   72.80 %
+#   Ergebnis: FAIL
+#
+# main and the branch are measured in two parallel jobs with exactly the same
+# setup (same image, same JaCoCo configuration via the init script), then compared.
+on:
+  pull_request:
+    branches: [main]
+    types: [opened, synchronize, reopened]
+  workflow_dispatch: # compares the branch selected in "Run workflow" with main
+
+permissions:
+  contents: read
+  packages: read
+
+# a new push to the pull request makes the running check obsolete
+concurrency:
+  group: coverage-gate-${{ github.head_ref || github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  image:
+    name: DevContainer image
+    uses: ./.github/workflows/devcontainer-ref.yml
+
+  main:
+    name: Coverage main
+    needs: image
+    runs-on: ubuntu-latest
+    container:
+      image: ${{ needs.image.outputs.image }}
+      options: --user root
+      credentials:
+        username: ${{ github.actor }}
+        password: ${{ secrets.GITHUB_TOKEN }}
+    outputs:
+      coverage: ${{ steps.coverage.outputs.coverage }}
+      commit: ${{ steps.main.outputs.commit }}
+
+    steps:
+      # the gate's scripts come from the branch under test, the code from main
+      - uses: actions/checkout@v4
+        with:
+          sparse-checkout: .github
+
+      - id: main
+        uses: actions/checkout@v4
+        with:
+          ref: main
+          path: main-src
+
+      - uses: gradle/actions/setup-gradle@v4
+
+      - name: Run tests on main
+        working-directory: main-src
+        run: ./gradlew test jacocoTestReport --init-script "$GITHUB_WORKSPACE/.github/scripts/jacoco.init.gradle"
+
+      - id: coverage
+        run: |
+          coverage=$(.github/scripts/coverage.sh main-src/build/reports/jacoco/test/jacocoTestReport.csv)
+          echo "Coverage main (${{ steps.main.outputs.commit }}): $coverage %"
+          echo "coverage=$coverage" >> "$GITHUB_OUTPUT"
+
+  branch:
+    name: Coverage branch
+    needs: image
+    runs-on: ubuntu-latest
+    container:
+      image: ${{ needs.image.outputs.image }}
+      options: --user root
+      credentials:
+        username: ${{ github.actor }}
+        password: ${{ secrets.GITHUB_TOKEN }}
+    outputs:
+      coverage: ${{ steps.coverage.outputs.coverage }}
+      commit: ${{ steps.branch.outputs.commit }}
+
+    steps:
+      # for a pull request this is the merge result, i.e. what would land on main
+      - id: branch
+        uses: actions/checkout@v4
+
+      - uses: gradle/actions/setup-gradle@v4
+
+      - name: Run tests on the branch
+        run: ./gradlew test jacocoTestReport --init-script .github/scripts/jacoco.init.gradle
+
+      - id: coverage
+        run: |
+          coverage=$(.github/scripts/coverage.sh)
+          echo "Coverage branch (${{ steps.branch.outputs.commit }}): $coverage %"
+          echo "coverage=$coverage" >> "$GITHUB_OUTPUT"
+
+  compare:
+    name: Compare (PASS / FAIL)
+    needs: [main, branch]
+    runs-on: ubuntu-latest
+    steps:
+      - name: Branch coverage must not be lower than main
+        env:
+          MAIN: ${{ needs.main.outputs.coverage }}
+          BRANCH: ${{ needs.branch.outputs.coverage }}
+          MAIN_COMMIT: ${{ needs.main.outputs.commit }}
+          BRANCH_COMMIT: ${{ needs.branch.outputs.commit }}
+          BRANCH_NAME: ${{ github.head_ref || github.ref_name }}
+        run: |
+          diff=$(awk -v b="$BRANCH" -v m="$MAIN" 'BEGIN { printf "%+.2f", b - m }')
+          if awk -v b="$BRANCH" -v m="$MAIN" 'BEGIN { exit !(b + 0 >= m + 0) }'; then
+            result=PASS; icon="✅"
+          else
+            result=FAIL; icon="❌"
+          fi
+
+          printf 'main:      %6s %%\n' "$MAIN"
+          printf 'Branch:    %6s %%\n' "$BRANCH"
+          printf 'Differenz: %6s Prozentpunkte\n' "$diff"
+          printf 'Ergebnis:  %s\n' "$result"
+
+          {
+            echo "### $icon Coverage Gate: $result"
+            echo
+            echo "| | Commit | Line Coverage |"
+            echo "|---|---|---:|"
+            echo "| \`main\` | \`${MAIN_COMMIT:0:7}\` | $MAIN % |"
+            echo "| \`$BRANCH_NAME\` | \`${BRANCH_COMMIT:0:7}\` | $BRANCH % |"
+            echo "| **Differenz** | | **$diff pp** |"
+            echo
+            echo "Regel: Ein Branch darf keine tiefere Test Coverage haben als der aktuelle \`main\`-Branch."
+          } >> "$GITHUB_STEP_SUMMARY"
+
+          if [ "$result" = FAIL ]; then
+            echo "::error title=Coverage Gate::Coverage $BRANCH % liegt $diff Prozentpunkte unter main ($MAIN %)"
+            exit 1
+          fi
