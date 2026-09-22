@@ -1,0 +1,21 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>GreedyPlayer.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">tictactoe</a> &gt; <a href="index.source.html" class="el_package">ch.bbw.m450.tictactoe.players</a> &gt; <span class="el_source">GreedyPlayer.java</span></div><h1>GreedyPlayer.java</h1><pre class="source lang-java linenums">package ch.bbw.m450.tictactoe.players;
+
+import ch.bbw.m450.tictactoe.TicTacToeMain;
+import ch.bbw.m450.tictactoe.TicTacToePlayer;
+
+/**
+ * Valid (but stupid) player, who always plays as much top-left as possible.
+ */
+<span class="fc" id="L9">public class GreedyPlayer implements TicTacToePlayer {</span>
+
+	@Override
+	public int play(Stone[] board, Stone colorToPlay) {
+<span class="pc bpc" id="L13" title="1 of 2 branches missed.">		for (var i = 0; i &lt; TicTacToeMain.BOARD_SIZE; i++) {</span>
+<span class="fc bfc" id="L14" title="All 2 branches covered.">			if (board[i] == null) {</span>
+<span class="fc" id="L15">				return i;</span>
+			}
+		}
+<span class="nc" id="L18">		throw new IllegalStateException(&quot;cannot play at all&quot;);</span>
+	}
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.15.202606040825</span></div></body></html>

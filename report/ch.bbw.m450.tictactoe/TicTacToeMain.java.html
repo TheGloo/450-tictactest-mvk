@@ -1,0 +1,95 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>TicTacToeMain.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">tictactoe</a> &gt; <a href="index.source.html" class="el_package">ch.bbw.m450.tictactoe</a> &gt; <span class="el_source">TicTacToeMain.java</span></div><h1>TicTacToeMain.java</h1><pre class="source lang-java linenums">package ch.bbw.m450.tictactoe;
+
+import java.util.Arrays;
+
+import ch.bbw.m450.tictactoe.TicTacToePlayer.Stone;
+import ch.bbw.m450.tictactoe.players.GreedyPlayer;
+import ch.bbw.m450.tictactoe.players.HumanPlayer;
+
+/**
+ * A small tic-tac-toe board. Initially with a human and a primitive but valid computer player.
+ */
+<span class="nc" id="L12">public class TicTacToeMain {</span>
+
+	public static final int BOARD_SIZE = 9;
+
+	public static void main(String[] args) {
+<span class="nc" id="L17">		play(new HumanPlayer(), new GreedyPlayer());</span>
+<span class="nc" id="L18">	}</span>
+
+	/**
+	 * @param b TicTacToe-board to check for a winner
+	 * @param color either X or O
+	 * @return true if the colorToPlay wins the current board (has three in a line)
+	 */
+	public static boolean isWin(Stone[] b, Stone color) {
+		// @formatter:off
+<span class="pc bpc" id="L27" title="4 of 48 branches missed.">		return  b[0] == color &amp;&amp; b[0] == b[1] &amp;&amp; b[1] == b[2] ||</span>
+				b[3] == color &amp;&amp; b[3] == b[4] &amp;&amp; b[4] == b[5] ||
+				b[6] == color &amp;&amp; b[6] == b[7] &amp;&amp; b[7] == b[8] ||
+				b[0] == color &amp;&amp; b[0] == b[3] &amp;&amp; b[3] == b[6] ||
+				b[1] == color &amp;&amp; b[1] == b[4] &amp;&amp; b[4] == b[7] ||
+				b[2] == color &amp;&amp; b[2] == b[5] &amp;&amp; b[5] == b[8] ||
+				b[0] == color &amp;&amp; b[0] == b[4] &amp;&amp; b[4] == b[8] ||
+				b[2] == color &amp;&amp; b[2] == b[4] &amp;&amp; b[4] == b[6];
+		// @formatter:on
+	}
+
+	public static String toString(Stone[] board) {
+<span class="fc" id="L39">		var sb = new StringBuilder();</span>
+<span class="fc bfc" id="L40" title="All 2 branches covered.">		for (var i = 0; i &lt; 3; i++) {</span>
+<span class="fc bfc" id="L41" title="All 2 branches covered.">			for (var j = 0; j &lt; 3; j++) {</span>
+<span class="fc" id="L42">				var index = i * 3 + j;</span>
+<span class="fc bfc" id="L43" title="All 2 branches covered.">				String color = board[index] == Stone.CROSS ? &quot;X&quot; : &quot;O&quot;;</span>
+<span class="fc" id="L44">				color = &quot;\033[1m&quot; + color + &quot;\033[0m&quot;;</span>
+<span class="fc bfc" id="L45" title="All 2 branches covered.">				color = board[index] == null ? &quot;\033[37m&quot; + index + &quot;\033[0m&quot; : color;</span>
+<span class="fc" id="L46">				sb.append(color)</span>
+<span class="fc" id="L47">						.append(&quot;  &quot;);</span>
+			}
+<span class="fc" id="L49">			sb.append(&quot;\n&quot;);</span>
+		}
+<span class="fc" id="L51">		return sb.toString();</span>
+	}
+
+	/**
+	 * The main game loop to play a game of tic-tac-toe with two opponents.
+	 *
+	 * @param xPlayer the player to start
+	 * @param oPlayer the 2nd player. Must not be the same as xPlayer
+	 * @return the winning Color or `null` on draw
+	 */
+	public static Stone play(TicTacToePlayer xPlayer, TicTacToePlayer oPlayer) {
+		// the board is organized as a 1-dimensional matrix of size 3x3=9
+		// to get the index for position at row r and colum c, calculate index=r*3+c
+		//     0 | 1 | 2
+		//    ---+---+---
+		//     3 | 4 | 5
+		//    ---+---+---
+		//     6 | 7 | 8
+<span class="fc bfc" id="L69" title="All 2 branches covered.">		if(xPlayer == oPlayer) {</span>
+<span class="fc" id="L70">			throw new IllegalArgumentException(&quot;players must differ&quot;);</span>
+		}
+<span class="fc" id="L72">		var board = new Stone[BOARD_SIZE]; // all null -&gt; empty</span>
+<span class="fc" id="L73">		var currentPlayer = xPlayer;</span>
+<span class="pc bpc" id="L74" title="1 of 2 branches missed.">		for (var round = 0; round &lt; BOARD_SIZE; round++) { // it lasts for 9 rounds</span>
+<span class="fc bfc" id="L75" title="All 2 branches covered.">			var currentColor = currentPlayer == xPlayer ? Stone.CROSS : Stone.CIRCLE;</span>
+			// we copy to avoid side effects by the player (not needed if they behave)
+<span class="fc" id="L77">			var clone = Arrays.copyOf(board, board.length);</span>
+<span class="fc" id="L78">			var playTo = currentPlayer.play(clone, currentColor);</span>
+<span class="fc bfc" id="L79" title="All 6 branches covered.">			if (playTo &lt; 0 || playTo &gt;= 9 || board[playTo] != null) {</span>
+<span class="fc" id="L80">				System.out.println(toString(board));</span>
+<span class="fc" id="L81">				throw new IllegalStateException(&quot;cannot play to position &quot; + playTo);</span>
+			}
+<span class="fc" id="L83">			board[playTo] = currentColor; // do the move</span>
+<span class="fc bfc" id="L84" title="All 2 branches covered.">			if (isWin(board, currentColor)) { // game over and current player wins</span>
+<span class="fc" id="L85">				System.out.println(toString(board) + &quot;...and the winner is: &quot; + currentColor);</span>
+<span class="fc" id="L86">				return currentColor;</span>
+			}
+<span class="fc bfc" id="L88" title="All 2 branches covered.">			currentPlayer = currentPlayer == xPlayer ? oPlayer : xPlayer;</span>
+		}
+<span class="nc" id="L90">		System.out.println(&quot;it's a draw!&quot;);</span>
+<span class="nc" id="L91">		return null;</span>
+	}
+
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.15.202606040825</span></div></body></html>

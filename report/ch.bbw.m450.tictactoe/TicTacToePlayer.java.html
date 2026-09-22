@@ -1,0 +1,25 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>TicTacToePlayer.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">tictactoe</a> &gt; <a href="index.source.html" class="el_package">ch.bbw.m450.tictactoe</a> &gt; <span class="el_source">TicTacToePlayer.java</span></div><h1>TicTacToePlayer.java</h1><pre class="source lang-java linenums">package ch.bbw.m450.tictactoe;
+
+public interface TicTacToePlayer {
+
+	/**
+	 * Decide on the next move on a partially played TicTacToe-board.
+	 *
+	 * @param board the current board to play on
+	 * @param colorToPlay my own color
+	 * @return the position to play to (0-8), where 0 is top-left
+	 */
+	int play(Stone[] board, Stone colorToPlay);
+
+	/**
+	 * Represents the state of a single piece/field on the TicTacToe-board.
+	 */
+<span class="fc" id="L17">	enum Stone {</span>
+<span class="fc" id="L18">		CROSS, CIRCLE;</span>
+
+		public Stone opponent() {
+<span class="pc bpc" id="L21" title="1 of 2 branches missed.">			return this == Stone.CROSS ? Stone.CIRCLE : Stone.CROSS;</span>
+		}
+	}
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.15.202606040825</span></div></body></html>
