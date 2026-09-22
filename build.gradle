@@ -1,5 +1,6 @@
 plugins {
 	id 'java'
+	id 'jacoco'
 }
 
 repositories {
@@ -23,5 +24,25 @@ test {
 	useJUnitPlatform()
 	testLogging {
 		events 'passed', 'skipped', 'failed'
+	}
+	// every test run also produces the coverage report
+	finalizedBy jacocoTestReport
+}
+
+jacoco {
+	// 0.8.14+ is required to instrument Java 25 class files
+	toolVersion = '0.8.15'
+}
+
+// Coverage report in build/reports/jacoco/test/:
+//   html/                     - human readable, uploaded as CI artifact
+//   jacocoTestReport.csv      - read by .github/scripts/coverage.sh (time series, PR gate)
+//   jacocoTestReport.xml      - for tools that expect the JaCoCo XML format
+jacocoTestReport {
+	dependsOn test
+	reports {
+		html.required = true
+		xml.required = true
+		csv.required = true
 	}
 }
