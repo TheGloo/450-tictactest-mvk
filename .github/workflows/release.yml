@@ -9,13 +9,19 @@ permissions:
   packages: read
 
 jobs:
+  image:
+    name: DevContainer image
+    uses: ./.github/workflows/devcontainer-ref.yml
+
   release:
     name: Build & Publish Release
+    needs: image
     runs-on: ubuntu-latest
 
-    # Same image as the CI job: Zulu 25 + Gradle distribution baked in.
+    # Same image as the CI job: the DevContainer version pinned in devcontainer.json.
     container:
-      image: ghcr.io/thegloo/450-tictactest-mvk:latest
+      image: ${{ needs.image.outputs.image }}
+      options: --user root
       credentials:
         username: ${{ github.actor }}
         password: ${{ secrets.GITHUB_TOKEN }}
@@ -36,6 +42,8 @@ jobs:
         env:
           GH_TOKEN: ${{ github.token }}
         run: |
+          # the workspace belongs to the runner's UID, not to root in the container
+          git config --global --add safe.directory "$GITHUB_WORKSPACE"
           gh release create "$GITHUB_REF_NAME" \
             build/libs/*.jar \
             --title "$GITHUB_REF_NAME" \

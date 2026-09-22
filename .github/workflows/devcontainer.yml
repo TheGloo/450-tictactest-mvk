@@ -1,0 +1,189 @@
+name: DevContainer
+
+# Build, test and release the DevContainer image (.devcontainer/Dockerfile).
+# The full process is described in docs/DEVCONTAINER.md.
+#
+#   pull request / push to main   build + smoke test only, nothing is pushed
+#   tag devcontainer-vX.Y.Z       build + smoke test, push ghcr.io/...:X.Y.Z (released),
+#                                 then open a pull request that switches
+#                                 devcontainer.json (and with it CI + local) to X.Y.Z
+on:
+  pull_request:
+    paths:
+      - .devcontainer/**
+      - .dockerignore
+      - gradle/**
+      - gradlew
+      - build.gradle
+      - settings.gradle
+      - gradle.properties
+      - .github/workflows/devcontainer.yml
+  push:
+    branches: [main]
+    paths:
+      - .devcontainer/**
+      - .dockerignore
+      - gradle/**
+      - gradlew
+      - build.gradle
+      - settings.gradle
+      - gradle.properties
+      - .github/workflows/devcontainer.yml
+    tags: ['devcontainer-v*'] # path filters do not apply to tags
+
+permissions:
+  contents: read
+
+env:
+  IMAGE: ghcr.io/thegloo/450-tictactest-mvk
+  CANDIDATE: tictactest-devcontainer:candidate
+
+jobs:
+  build:
+    name: Build & test image
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      packages: write
+    outputs:
+      version: ${{ steps.version.outputs.version }}
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Version from tag
+        id: version
+        if: startsWith(github.ref, 'refs/tags/devcontainer-v')
+        run: |
+          version="${GITHUB_REF_NAME#devcontainer-v}"
+          if ! [[ "$version" =~ ^[0-9]+\.[0-9]+\.[0-9]+$ ]]; then
+            echo "::error::Tag $GITHUB_REF_NAME ist keine gültige Version - erwartet devcontainer-vMAJOR.MINOR.PATCH"
+            exit 1
+          fi
+          echo "Releasing DevContainer image $version"
+          echo "version=$version" >> "$GITHUB_OUTPUT"
+
+      # the docker-container driver is needed for the type=gha build cache
+      - uses: docker/setup-buildx-action@v3
+
+      - name: Log in to GHCR
+        if: steps.version.outputs.version
+        uses: docker/login-action@v3
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      # released versions are immutable: a tag that already exists is never overwritten
+      - name: Refuse to overwrite a released version
+        if: steps.version.outputs.version
+        env:
+          VERSION: ${{ steps.version.outputs.version }}
+        run: |
+          if docker buildx imagetools inspect "$IMAGE:$VERSION" > /dev/null 2>&1; then
+            echo "::error::$IMAGE:$VERSION ist bereits veröffentlicht - bitte eine neue Version taggen"
+            exit 1
+          fi
+
+      - name: Build candidate
+        uses: docker/build-push-action@v6
+        with:
+          context: .
+          file: .devcontainer/Dockerfile
+          load: true
+          tags: ${{ env.CANDIDATE }}
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
+
+      # Only an image that passes these checks is ever pushed with a version tag.
+      - name: Smoke test
+        run: |
+          set -x
+          docker run --rm "$CANDIDATE" sh -c 'java -version && gradle --version && junit --help > /dev/null && git --version && gh --version'
+          # default user must be 1000:1000
+          test "$(docker run --rm "$CANDIDATE" id -u):$(docker run --rm "$CANDIDATE" id -g)" = "1000:1000"
+          # the project must build and pass its tests in the image, exactly as in CI
+          docker run --rm --user root -v "$PWD:/work" -w /work "$CANDIDATE" ./gradlew build --no-daemon
+
+      - name: Push released version
+        if: steps.version.outputs.version
+        uses: docker/build-push-action@v6
+        with:
+          context: .
+          file: .devcontainer/Dockerfile
+          push: true
+          # identical build, served from the cache of the candidate build
+          cache-from: type=gha
+          labels: org.opencontainers.image.version=${{ steps.version.outputs.version }}
+          tags: |
+            ${{ env.IMAGE }}:${{ steps.version.outputs.version }}
+            ${{ env.IMAGE }}:latest
+
+      - name: Summary
+        env:
+          VERSION: ${{ steps.version.outputs.version }}
+        run: |
+          if [ -n "$VERSION" ]; then
+            echo "### 🚀 DevContainer \`$IMAGE:$VERSION\` veröffentlicht" >> "$GITHUB_STEP_SUMMARY"
+          else
+            echo "### ✅ DevContainer-Image gebaut und getestet (nicht veröffentlicht)" >> "$GITHUB_STEP_SUMMARY"
+          fi
+
+  bump:
+    name: Pull request to use the new version
+    needs: build
+    if: needs.build.outputs.version != ''
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write      # push the bump branch
+      pull-requests: write # open the pull request
+      actions: write       # start CI on it (see last step)
+    env:
+      VERSION: ${{ needs.build.outputs.version }}
+      BRANCH: devcontainer/bump-${{ needs.build.outputs.version }}
+
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: main
+
+      # devcontainer.json is the single place the version lives; every workflow
+      # reads it from there (devcontainer-ref.yml).
+      - name: Set version in devcontainer.json
+        run: |
+          file=.devcontainer/devcontainer.json
+          if [ ! -f "$file" ]; then
+            echo "::notice::$file existiert auf main noch nicht - kein Pull Request nötig"
+            exit 0
+          fi
+          sed -i -E "s#(\"image\":[[:space:]]*\"${IMAGE}:)[^\"]+\"#\1${VERSION}\"#" "$file"
+          git diff
+
+      - id: pr
+        uses: peter-evans/create-pull-request@v8
+        with:
+          branch: ${{ env.BRANCH }}
+          commit-message: "build(devcontainer): use image ${{ env.VERSION }}"
+          title: "DevContainer auf Version ${{ env.VERSION }} aktualisieren"
+          body: |
+            Das DevContainer-Image **`${{ env.IMAGE }}:${{ env.VERSION }}`** wurde gebaut, getestet und veröffentlicht
+            (Tag `${{ github.ref_name }}`, [Workflow-Lauf](${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }})).
+
+            Dieser Pull Request stellt `.devcontainer/devcontainer.json` auf die neue Version um. Nach dem Merge
+            - verwenden **alle CI-Jobs** das neue Image (sie lesen die Version aus `devcontainer.json`),
+            - bietet VS Code **lokal** "Rebuild Container" an und zieht die neue Version.
+
+            CI und Coverage Gate wurden für diesen Branch automatisch gestartet – erst mergen, wenn beide grün sind.
+          delete-branch: true
+
+      # Pull requests opened with GITHUB_TOKEN do not trigger pull_request
+      # workflows, but workflow_dispatch does - so start the checks explicitly.
+      - name: Run CI on the pull request
+        if: steps.pr.outputs.pull-request-operation == 'created' || steps.pr.outputs.pull-request-operation == 'updated'
+        env:
+          GH_TOKEN: ${{ github.token }}
+          PR_URL: ${{ steps.pr.outputs.pull-request-url }}
+        run: |
+          gh workflow run ci.yml --ref "$BRANCH"
+          gh workflow run coverage-gate.yml --ref "$BRANCH"
+          echo "### 🔀 Pull Request: $PR_URL" >> "$GITHUB_STEP_SUMMARY"
