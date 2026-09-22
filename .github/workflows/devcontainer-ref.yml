@@ -1,0 +1,44 @@
+name: DevContainer image reference
+
+# Reusable workflow: reads the released DevContainer image that
+# .devcontainer/devcontainer.json pins (e.g. ghcr.io/thegloo/450-tictactest-mvk:1.0.0)
+# and hands it to the calling workflow, which runs its jobs in that container:
+#
+#   jobs:
+#     image:
+#       uses: ./.github/workflows/devcontainer-ref.yml
+#     build:
+#       needs: image
+#       container:
+#         image: ${{ needs.image.outputs.image }}
+#
+# So devcontainer.json is the only place the version is written down: local VS Code
+# and every CI job always use the same image, and the automatic bump pull request
+# (devcontainer.yml) only has to change that one line.
+on:
+  workflow_call:
+    outputs:
+      image:
+        description: Image reference including the version tag
+        value: ${{ jobs.read.outputs.image }}
+
+jobs:
+  read:
+    name: Read pinned image
+    runs-on: ubuntu-latest
+    outputs:
+      image: ${{ steps.read.outputs.image }}
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          sparse-checkout: .devcontainer
+
+      - id: read
+        run: |
+          image=$(sed -n 's/^[[:space:]]*"image":[[:space:]]*"\([^"]*\)".*/\1/p' .devcontainer/devcontainer.json)
+          if [ -z "$image" ]; then
+            echo "::error file=.devcontainer/devcontainer.json::no \"image\" entry found"
+            exit 1
+          fi
+          echo "DevContainer image: $image"
+          echo "image=$image" >> "$GITHUB_OUTPUT"

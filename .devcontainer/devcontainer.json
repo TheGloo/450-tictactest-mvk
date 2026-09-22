@@ -1,0 +1,40 @@
+// DevContainer für TicTacTest (M450) - siehe docs/DEVCONTAINER.md
+{
+	"name": "TicTacTest (Alpine, Java 25, Gradle)",
+
+	// Freigegebene Version des Images aus .devcontainer/Dockerfile.
+	// Diese Zeile ist die einzige Stelle, an der die Version steht: auch alle
+	// GitHub-Actions-Jobs lesen sie von hier (.github/workflows/devcontainer-ref.yml).
+	// Nach jedem Release erhöht ein automatisch erstellter Pull Request die Version.
+	"image": "ghcr.io/thegloo/450-tictactest-mvk:1.0.0",
+
+	// Das Image selbst lokal bauen statt die freigegebene Version zu ziehen
+	// (zum Testen von Änderungen am Dockerfile): "image" auskommentieren und
+	// stattdessen diesen Block aktivieren.
+	// "build": {
+	// 	"dockerfile": "Dockerfile",
+	// 	"context": ".."
+	// },
+
+	"remoteUser": "dev",
+	"containerUser": "dev",
+
+	"customizations": {
+		"vscode": {
+			"extensions": [
+				"vscjava.vscode-java-pack",
+				"vscjava.vscode-gradle",
+				"ryanluker.vscode-coverage-gutters",
+				"github.vscode-github-actions",
+				"bierner.markdown-mermaid"
+			],
+			"settings": {
+				"java.import.gradle.wrapper.enabled": true,
+				"coverage-gutters.coverageBaseDir": "build/reports/jacoco",
+				"coverage-gutters.coverageFileNames": ["jacocoTestReport.xml"]
+			}
+		}
+	},
+
+	"postCreateCommand": "./gradlew --version"
+}

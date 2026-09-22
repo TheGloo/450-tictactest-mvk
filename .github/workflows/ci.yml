@@ -1,8 +1,9 @@
 name: CI
 
 on:
+  # every branch gets tests and a coverage report (gh-pages only holds the published site)
   push:
-    branches: [main]
+    branches-ignore: [gh-pages]
   pull_request:
     branches: [main]
   workflow_dispatch:
@@ -12,18 +13,27 @@ permissions:
   packages: read
 
 jobs:
+  image:
+    name: DevContainer image
+    uses: ./.github/workflows/devcontainer-ref.yml
+
   build:
-    name: Build & Test
+    name: Build, Test & Coverage
+    needs: image
     runs-on: ubuntu-latest
 
-    # Run every step inside our own image from the GitHub Container Registry.
-    # It already provides Zulu 25 (the pinned daemon JVM) and the Gradle
-    # distribution, so there is no "Set up JDK" step anymore.
+    # Run every step inside the released DevContainer image from the GitHub
+    # Container Registry (Zulu 25, Gradle, JUnit). --user root: the runner mounts
+    # the workspace with its own UID, the image's default user is dev (1000).
     container:
-      image: ghcr.io/thegloo/450-tictactest-mvk:latest
+      image: ${{ needs.image.outputs.image }}
+      options: --user root
       credentials:
         username: ${{ github.actor }}
         password: ${{ secrets.GITHUB_TOKEN }}
+
+    outputs:
+      coverage: ${{ steps.coverage.outputs.line }}
 
     steps:
       - uses: actions/checkout@v4
@@ -31,8 +41,37 @@ jobs:
       - name: Set up Gradle
         uses: gradle/actions/setup-gradle@v4
 
+      # `test` is finalized by `jacocoTestReport`, so this also measures coverage
       - name: Build and run tests
         run: ./gradlew build --stacktrace
+
+      - name: Coverage summary
+        id: coverage
+        run: |
+          csv=build/reports/jacoco/test/jacocoTestReport.csv
+          line=$(.github/scripts/coverage.sh "$csv" LINE)
+          branch=$(.github/scripts/coverage.sh "$csv" BRANCH)
+          instruction=$(.github/scripts/coverage.sh "$csv" INSTRUCTION)
+          echo "line=$line" >> "$GITHUB_OUTPUT"
+          echo "Line coverage: $line %  (branch: $branch %, instruction: $instruction %)"
+          {
+            echo "### Test Coverage (JaCoCo) – \`${GITHUB_REF_NAME}\`"
+            echo
+            echo "| Metrik | Coverage |"
+            echo "|---|---:|"
+            echo "| **Line** | **$line %** |"
+            echo "| Branch | $branch % |"
+            echo "| Instruction | $instruction % |"
+            echo
+            echo "Der vollständige HTML-Report liegt im Artefakt **coverage-report**."
+          } >> "$GITHUB_STEP_SUMMARY"
+
+      - name: Upload coverage report
+        uses: actions/upload-artifact@v4
+        with:
+          name: coverage-report
+          path: build/reports/jacoco/test/html
+          if-no-files-found: error
 
       - name: Upload test report
         if: always()
@@ -48,3 +87,38 @@ jobs:
           name: tictactoe-jar
           path: build/libs/*.jar
           if-no-files-found: error
+
+  coverage-pages:
+    name: Coverage time series (GitHub Pages)
+    needs: build
+    if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write # push the gh-pages branch
+    # one writer at a time, so two quick pushes to main cannot lose a row
+    concurrency:
+      group: coverage-pages
+      cancel-in-progress: false
+
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          sparse-checkout: .github/actions
+
+      - uses: actions/download-artifact@v4
+        with:
+          name: coverage-report
+          path: coverage-report
+
+      - name: Update and publish time series
+        id: pages
+        uses: ./.github/actions/coverage-timeseries
+        with:
+          coverage: ${{ needs.build.outputs.coverage }}
+          report-dir: coverage-report
+
+      - name: Summary
+        env:
+          COVERAGE: ${{ needs.build.outputs.coverage }}
+          PAGE_URL: ${{ steps.pages.outputs.page-url }}
+        run: echo "Coverage **$COVERAGE %** zur Time-Series hinzugefügt → $PAGE_URL" >> "$GITHUB_STEP_SUMMARY"

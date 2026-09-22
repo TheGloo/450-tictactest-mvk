@@ -34,7 +34,8 @@ Gegenstand dieses Konzepts.
 | Dokument | Inhalt |
 |---|---|
 | [TESTDOKUMENTATION.md](TESTDOKUMENTATION.md) | GIVEN/WHEN/THEN-Beschreibung jedes einzelnen Testfalls, Testprotokolle, Screenshots |
-| [CONTAINER.md](CONTAINER.md) | Container-Image, in dem die Tests in der CI ausgeführt werden |
+| [DEVCONTAINER.md](DEVCONTAINER.md) | DevContainer-Image, in dem die Tests lokal und in der CI ausgeführt werden |
+| [COVERAGE.md](COVERAGE.md) | Coverage-Messung mit JaCoCo, Time-Series und Coverage Gate |
 
 ---
 
@@ -118,7 +119,6 @@ Was heute **nicht** durch automatisierte Tests abgedeckt ist, und warum:
 | `HumanPlayer.play(...)` | liest über einen `Scanner` von `System.in` und ist ohne Injektion einer Eingabequelle nicht deterministisch ausführbar. Die Klasse enthält ausserdem keine Fehlerbehandlung für `Integer.parseInt` (siehe Risiko R4). |
 | Remis-Pfad von `play` (`return null` nach 9 Runden) | wird von keinem der vorhandenen Testfälle durchlaufen; der `DRAW`-Brettzustand wird nur statisch über `isWin` geprüft (T2). |
 | Exaktes Ausgabeformat von `toString` | die ANSI-Escape-Sequenzen sind rein kosmetisch; geprüft wird in T3 nur, dass die Gewinnmeldung in der Ausgabe erscheint. |
-| Code-Coverage-Messung | im Projekt ist kein Coverage-Werkzeug (z. B. JaCoCo) konfiguriert; die Überdeckung wird über die Verfahren in 4.2 argumentativ, nicht metrisch belegt. |
 | Nichtfunktionale Tests | bei einem 3×3-Brett ohne Persistenz und Netzwerk gegenstandslos. |
 
 ---
@@ -224,7 +224,8 @@ ohne Zielbezug.
 | Build | Gradle Wrapper `9.7.0`; Testlauf mit `./gradlew test`, Gesamtbuild mit `./gradlew build` |
 | Testberichte | `build/reports/tests/test/index.html`; Konsolenausgabe über `testLogging { events 'passed', 'skipped', 'failed' }` |
 | Isolation | keine externen Systeme, keine Datenbank, kein Netzwerk; `System.in` wird durch Test-Doubles ersetzt, `System.out` durch `ConsoleCapture` gekapselt |
-| CI | GitHub Actions (`.github/workflows/ci.yml`) bei jedem Push und PR auf `main`; der Job läuft im projekteigenen Container-Image `ghcr.io/thegloo/450-tictactest-mvk:latest` und lädt den Testreport als Artefakt hoch |
+| Coverage | JaCoCo `0.8.15`; `./gradlew test` erzeugt den Report unter `build/reports/jacoco/test/` (HTML, XML, CSV). Metrik für Verlauf und Gate: Line Coverage, siehe [COVERAGE.md](COVERAGE.md) |
+| CI | GitHub Actions (`.github/workflows/ci.yml`) bei jedem Push auf jeden Branch und bei PRs auf `main`; der Job läuft im DevContainer-Image `ghcr.io/thegloo/450-tictactest-mvk` (Version aus `.devcontainer/devcontainer.json`) und lädt Test- und Coverage-Report als Artefakte hoch. Das Coverage Gate (`coverage-gate.yml`) verhindert, dass ein PR die Coverage von `main` senkt |
 | Reproduzierbarkeit | feste Abhängigkeitsversionen, gepinnte JDK-Version, Gradle Wrapper im Repository |
 
 ---
@@ -266,6 +267,7 @@ absichtlich fehlgeschlagenen Laufs stehen in
   ist durch mindestens einen Testfall abgedeckt (Kapitel 6).
 - Jedes Testziel Z1–Z7 ist einem Testfall zugeordnet.
 - Der CI-Workflow auf `main` läuft grün durch.
+- Das Coverage Gate meldet für jeden Pull Request PASS: Die Line Coverage liegt nicht unter der von `main`.
 - Die Testdokumentation ist auf dem Stand des Codes.
 
 ---

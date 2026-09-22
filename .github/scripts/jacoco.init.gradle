@@ -1,0 +1,23 @@
+// Gradle init script used by the coverage gate (.github/workflows/coverage-gate.yml).
+//
+// The gate measures main and the pull request with exactly the same JaCoCo setup,
+// even if one side's build.gradle configures JaCoCo differently or not at all
+// (e.g. main before the JaCoCo setup was merged).
+//
+// usage: ./gradlew test jacocoTestReport --init-script .github/scripts/jacoco.init.gradle
+allprojects {
+	pluginManager.withPlugin('java') {
+		pluginManager.apply('jacoco')
+
+		jacoco {
+			toolVersion = '0.8.15'
+		}
+
+		tasks.named('jacocoTestReport') {
+			dependsOn tasks.named('test')
+			reports {
+				csv.required = true
+			}
+		}
+	}
+}

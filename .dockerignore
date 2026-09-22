@@ -1,10 +1,13 @@
-# The image only needs the Gradle wrapper (see Dockerfile COPY lines).
-# Keep the build context small and reproducible.
+# Build context of .devcontainer/Dockerfile is the repository root, but the image
+# only needs the Gradle wrapper and the build files (see the COPY lines there).
+# Keep the context small and reproducible.
 .git
 .github
 .gradle
+.devcontainer
 build
 docs
+src
 *.md
 .idea
 *.iml
