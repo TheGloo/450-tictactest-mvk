@@ -1,0 +1,104 @@
+name: Coverage time series
+description: >
+  Appends a coverage value to the history CSV on the GitHub Pages branch, refreshes
+  the time-series page and the latest JaCoCo HTML report, and pushes the branch so
+  GitHub Pages republishes the site.
+
+inputs:
+  coverage:
+    description: Coverage in percent, e.g. "77.78" (see .github/scripts/coverage.sh)
+    required: true
+  report-dir:
+    description: JaCoCo HTML report to publish under /report (empty = skip)
+    required: false
+    default: ''
+  commit:
+    description: Commit the value belongs to
+    required: false
+    default: ${{ github.sha }}
+  branch:
+    description: Branch GitHub Pages publishes from; it also stores the history
+    required: false
+    default: gh-pages
+  history-file:
+    description: Name of the CSV file holding the history
+    required: false
+    default: coverage-history.csv
+  token:
+    description: Token with contents:write to push the Pages branch
+    required: false
+    default: ${{ github.token }}
+
+outputs:
+  page-url:
+    description: URL of the published time series
+    value: ${{ steps.publish.outputs.page-url }}
+
+runs:
+  using: composite
+  steps:
+    - id: publish
+      shell: bash
+      env:
+        COVERAGE: ${{ inputs.coverage }}
+        REPORT_DIR: ${{ inputs.report-dir }}
+        COMMIT: ${{ inputs.commit }}
+        BRANCH: ${{ inputs.branch }}
+        HISTORY: ${{ inputs.history-file }}
+        TOKEN: ${{ inputs.token }}
+      run: |
+        set -euo pipefail
+
+        if ! [[ "$COVERAGE" =~ ^[0-9]+(\.[0-9]+)?$ ]]; then
+          echo "::error::coverage must be a number, got '$COVERAGE'"
+          exit 1
+        fi
+
+        site="$RUNNER_TEMP/coverage-pages"
+        remote="https://x-access-token:${TOKEN}@${GITHUB_SERVER_URL#https://}/${GITHUB_REPOSITORY}.git"
+        rm -rf "$site"
+
+        # 1. Fetch the existing history - or start the Pages branch on the first run.
+        if git ls-remote --exit-code --heads "$remote" "$BRANCH" > /dev/null; then
+          git clone --quiet --depth 1 --branch "$BRANCH" "$remote" "$site"
+        else
+          echo "Branch $BRANCH does not exist yet - creating it"
+          git init --quiet --initial-branch "$BRANCH" "$site"
+          git -C "$site" remote add origin "$remote"
+        fi
+
+        # 2. Append the measurement. A re-run for the same commit does not add a
+        #    second row, so the history stays one row per commit on main.
+        csv="$site/$HISTORY"
+        [ -f "$csv" ] || echo "Datum,Commit,Coverage" > "$csv"
+        if grep -q ",${COMMIT}," "$csv"; then
+          echo "Commit $COMMIT is already in $HISTORY - keeping the existing row"
+        else
+          echo "$(date -u +%Y-%m-%dT%H:%M:%SZ),${COMMIT},${COVERAGE}" >> "$csv"
+        fi
+
+        # 3. Page and latest HTML report. The page reads the CSV in the browser,
+        #    so the history file stays the single source of the chart.
+        sed "s/__HISTORY_FILE__/${HISTORY}/g" "$GITHUB_ACTION_PATH/index.html" > "$site/index.html"
+        touch "$site/.nojekyll" # serve files as they are, no Jekyll build
+        if [ -n "$REPORT_DIR" ]; then
+          rm -rf "$site/report"
+          cp -r "$REPORT_DIR" "$site/report"
+        fi
+
+        # 4. Publish: pushing the branch triggers the GitHub Pages deployment.
+        cd "$site"
+        git config user.name "github-actions[bot]"
+        git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+        git add --all
+        if git diff --cached --quiet; then
+          echo "Nothing changed on $BRANCH"
+        else
+          git commit --quiet -m "coverage: ${COVERAGE} % for ${COMMIT:0:7}"
+          git push --quiet origin "HEAD:$BRANCH"
+        fi
+
+        owner="${GITHUB_REPOSITORY%%/*}"
+        url="https://${owner,,}.github.io/${GITHUB_REPOSITORY#*/}/"
+        echo "page-url=$url" >> "$GITHUB_OUTPUT"
+        echo "Rows in history: $(($(wc -l < "$csv") - 1)), page: $url"
