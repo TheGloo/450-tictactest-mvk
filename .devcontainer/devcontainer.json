@@ -6,7 +6,7 @@
 	// Diese Zeile ist die einzige Stelle, an der die Version steht: auch alle
 	// GitHub-Actions-Jobs lesen sie von hier (.github/workflows/devcontainer-ref.yml).
 	// Nach jedem Release erhöht ein automatisch erstellter Pull Request die Version.
-	"image": "ghcr.io/thegloo/450-tictactest-mvk:1.0.0",
+	"image": "ghcr.io/thegloo/450-tictactest-mvk:1.0.1",
 
 	// Das Image selbst lokal bauen statt die freigegebene Version zu ziehen
 	// (zum Testen von Änderungen am Dockerfile): "image" auskommentieren und
