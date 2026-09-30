@@ -114,23 +114,28 @@ Version dort, könnte der automatische Pull Request sie nicht anpassen.
 ```mermaid
 flowchart TD
     A["Änderung an .devcontainer/Dockerfile<br/>als Pull Request"] --> B["devcontainer.yml<br/>bauen + Smoke-Test<br/>(nichts wird gepusht)"]
-    B --> C[Review + Merge auf main]
-    C --> D["Release-Tag pushen<br/>git tag devcontainer-v1.1.0"]
-    D --> E["devcontainer.yml<br/>bauen + Smoke-Test"]
-    E -->|grün| F["Push nach GHCR<br/>:1.1.0 und :latest"]
-    F --> G["automatischer Pull Request<br/>devcontainer.json → 1.1.0"]
+    B --> C[Review + Merge = Push auf main]
+    C --> E["devcontainer.yml<br/>nächste PATCH-Version 1.0.1<br/>bauen + Smoke-Test"]
+    D["optional: Release-Tag für MINOR/MAJOR<br/>git tag devcontainer-v1.1.0"] --> E
+    E -->|grün| F["Push nach GHCR<br/>:1.0.1 und :latest<br/>+ Git-Tag devcontainer-v1.0.1"]
+    F --> G["automatischer Pull Request<br/>devcontainer.json → 1.0.1"]
     G --> H["CI + Coverage Gate<br/>laufen mit dem neuen Image"]
     H -->|grün| I[Merge]
-    I --> J["CI verwendet 1.1.0"]
-    I --> K["VS Code: Rebuild Container<br/>lokal 1.1.0"]
+    I --> J["CI verwendet 1.0.1"]
+    I --> K["VS Code: Rebuild Container<br/>lokal 1.0.1"]
 ```
 
 **Schritt für Schritt, eine neue Version veröffentlichen:**
 
 1. `Dockerfile` ändern, Pull Request eröffnen. Der Workflow *DevContainer* baut das
    Image und führt den Smoke-Test aus. **Es wird nichts veröffentlicht.**
-2. Nach dem Review mergen.
-3. Auf `main` die neue Version taggen und pushen:
+2. Nach dem Review mergen (oder direkt auf `main` pushen). **Jeder Push auf `main`**,
+   der das Image betrifft (`Dockerfile`, Gradle-Dateien, der Workflow selbst), gibt
+   automatisch die **nächste PATCH-Version** frei: höchster Tag `devcontainer-v*` + 1,
+   z. B. `1.0.0` → `1.0.1`. Ändert sich nur `devcontainer.json` (z. B. durch den
+   Merge des Versions-Pull-Requests), wird nichts veröffentlicht, sonst entstünde eine
+   Endlosschleife.
+3. *Optional* für eine neue MINOR- oder MAJOR-Version stattdessen von Hand taggen:
 
    ```bash
    git switch main && git pull
@@ -139,14 +144,16 @@ flowchart TD
    ```
 
 4. Der Workflow *DevContainer*
-   - prüft das Tag-Format `devcontainer-vMAJOR.MINOR.PATCH`,
+   - bestimmt die Version (nächste PATCH-Version bzw. aus dem Tag, Format
+     `devcontainer-vMAJOR.MINOR.PATCH`),
    - bricht ab, wenn diese Version in GHCR schon existiert,
    - baut das Image und führt den **Smoke-Test** aus: `java`, `gradle`, `junit`,
      `git`, `gh` vorhanden, Standardbenutzer ist `1000:1000`, und das Projekt baut
      inklusive aller Tests (`./gradlew build`) im Image,
-   - pusht **nur bei grünem Smoke-Test** `:1.1.0` und `:latest`,
-   - erstellt den Pull Request **„DevContainer auf Version 1.1.0 aktualisieren"**
-     (Branch `devcontainer/bump-1.1.0`), der `devcontainer.json` umstellt,
+   - pusht **nur bei grünem Smoke-Test** `:1.0.1` und `:latest`,
+   - setzt bei einer automatischen Version den Git-Tag `devcontainer-v1.0.1`,
+   - erstellt den Pull Request **„DevContainer auf Version 1.0.1 aktualisieren"**
+     (Branch `devcontainer/bump-1.0.1`), der `devcontainer.json` umstellt,
    - startet für diesen Branch **CI** und **Coverage Gate**. Pull Requests, die mit
      dem `GITHUB_TOKEN` erstellt werden, lösen selbst keine Workflows aus; ein
      `workflow_dispatch` hingegen schon.
@@ -159,8 +166,9 @@ flowchart TD
 
 ## 4. Versionierungskonzept
 
-Die Images werden nach **Semantic Versioning** `MAJOR.MINOR.PATCH` versioniert. Die
-Version entsteht ausschliesslich aus einem Git-Tag `devcontainer-vX.Y.Z`.
+Die Images werden nach **Semantic Versioning** `MAJOR.MINOR.PATCH` versioniert. Jede
+Version hat einen Git-Tag `devcontainer-vX.Y.Z`: PATCH-Versionen setzt der Workflow
+bei jedem Push auf `main` selbst, MINOR und MAJOR werden von Hand getaggt.
 
 | Teil | wird erhöht bei | Beispiele |
 |---|---|---|
@@ -179,9 +187,9 @@ Workflow `release.yml`). Die beiden Release-Prozesse stören sich nicht.
 
 ### Wie verhindert wird, dass unfreigegebene Images verwendet werden
 
-1. **Nur Release-Tags veröffentlichen.** Builds aus Pull Requests und von `main`
-   werden gebaut und getestet, aber nie in die Registry gepusht. Ein ungetestetes
-   oder nicht getaggtes Image existiert in GHCR gar nicht.
+1. **Nur `main` veröffentlicht.** Builds aus Pull Requests werden gebaut und
+   getestet, aber nie in die Registry gepusht. Veröffentlicht wird nur, was auf
+   `main` gemergt ist, immer unter einer neuen Versionsnummer.
 2. **Nur getestete Images werden gepusht.** Der Push-Schritt läuft erst nach dem
    grünen Smoke-Test, der das Projekt vollständig im Image baut und testet.
 3. **Versionen sind unveränderlich.** Existiert `:X.Y.Z` schon, bricht der Workflow ab.
@@ -205,7 +213,7 @@ Workflow `release.yml`). Die beiden Release-Prozesse stören sich nicht.
 
 ## Anhang: Image von Hand bauen und hochladen
 
-Nur für Notfälle, der normale Weg ist der Release-Tag (Kapitel 3). Ein PAT mit
+Nur für Notfälle, der normale Weg ist der Push auf `main` (Kapitel 3). Ein PAT mit
 `write:packages` ist nötig:
 
 ```bash

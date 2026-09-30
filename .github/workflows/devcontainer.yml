@@ -3,10 +3,12 @@ name: DevContainer
 # Build, test and release the DevContainer image (.devcontainer/Dockerfile).
 # The full process is described in docs/DEVCONTAINER.md.
 #
-#   pull request / push to main   build + smoke test only, nothing is pushed
-#   tag devcontainer-vX.Y.Z       build + smoke test, push ghcr.io/...:X.Y.Z (released),
-#                                 then open a pull request that switches
-#                                 devcontainer.json (and with it CI + local) to X.Y.Z
+#   pull request                  build + smoke test only, nothing is pushed
+#   push to main                  next PATCH version (latest devcontainer-v* tag + 1):
+#                                 build + smoke test, push ghcr.io/...:X.Y.Z, tag
+#                                 devcontainer-vX.Y.Z, then open a pull request that
+#                                 switches devcontainer.json (and with it CI + local)
+#   tag devcontainer-vX.Y.Z       same, with the version from the tag (for MINOR/MAJOR)
 on:
   pull_request:
     paths:
@@ -22,6 +24,9 @@ on:
     branches: [main]
     paths:
       - .devcontainer/**
+      # only the pinned version changes (bump pull request) - the image stays the same,
+      # releasing again would open the next bump pull request in an endless loop
+      - '!.devcontainer/devcontainer.json'
       - .dockerignore
       - gradle/**
       - gradlew
@@ -34,6 +39,11 @@ on:
 permissions:
   contents: read
 
+# two releases at the same time would compute the same next version
+concurrency:
+  group: devcontainer-${{ github.ref }}
+  cancel-in-progress: false
+
 env:
   IMAGE: ghcr.io/thegloo/450-tictactest-mvk
   CANDIDATE: tictactest-devcontainer:candidate
@@ -43,7 +53,7 @@ jobs:
     name: Build & test image
     runs-on: ubuntu-latest
     permissions:
-      contents: read
+      contents: write # push the release tag after a release from main
       packages: write
     outputs:
       version: ${{ steps.version.outputs.version }}
@@ -51,14 +61,29 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
-      - name: Version from tag
+      - name: Determine version
         id: version
-        if: startsWith(github.ref, 'refs/tags/devcontainer-v')
+        if: github.event_name == 'push'
         run: |
-          version="${GITHUB_REF_NAME#devcontainer-v}"
-          if ! [[ "$version" =~ ^[0-9]+\.[0-9]+\.[0-9]+$ ]]; then
-            echo "::error::Tag $GITHUB_REF_NAME ist keine gültige Version - erwartet devcontainer-vMAJOR.MINOR.PATCH"
-            exit 1
+          if [[ "$GITHUB_REF" == refs/tags/devcontainer-v* ]]; then
+            # manual release: version from the tag
+            version="${GITHUB_REF_NAME#devcontainer-v}"
+            if ! [[ "$version" =~ ^[0-9]+\.[0-9]+\.[0-9]+$ ]]; then
+              echo "::error::Tag $GITHUB_REF_NAME ist keine gültige Version - erwartet devcontainer-vMAJOR.MINOR.PATCH"
+              exit 1
+            fi
+          else
+            # push to main: next PATCH version after the highest release tag
+            latest=$(git ls-remote --tags --refs origin 'devcontainer-v*' \
+              | sed -n 's#.*refs/tags/devcontainer-v\([0-9]*\.[0-9]*\.[0-9]*\)$#\1#p' \
+              | sort -V | tail -n1)
+            if [ -z "$latest" ]; then
+              version=1.0.0
+            else
+              IFS=. read -r major minor patch <<< "$latest"
+              version="$major.$minor.$((patch + 1))"
+            fi
+            echo "tag=devcontainer-v$version" >> "$GITHUB_OUTPUT"
           fi
           echo "Releasing DevContainer image $version"
           echo "version=$version" >> "$GITHUB_OUTPUT"
@@ -119,6 +144,16 @@ jobs:
             ${{ env.IMAGE }}:${{ steps.version.outputs.version }}
             ${{ env.IMAGE }}:latest
 
+      # record the automatic release in git, like a manual release tag
+      # (tags pushed with GITHUB_TOKEN do not start this workflow again)
+      - name: Tag release
+        if: steps.version.outputs.tag
+        env:
+          TAG: ${{ steps.version.outputs.tag }}
+        run: |
+          git tag "$TAG" "$GITHUB_SHA"
+          git push origin "$TAG"
+
       - name: Summary
         env:
           VERSION: ${{ steps.version.outputs.version }}
@@ -167,7 +202,7 @@ jobs:
           title: "DevContainer auf Version ${{ env.VERSION }} aktualisieren"
           body: |
             Das DevContainer-Image **`${{ env.IMAGE }}:${{ env.VERSION }}`** wurde gebaut, getestet und veröffentlicht
-            (Tag `${{ github.ref_name }}`, [Workflow-Lauf](${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }})).
+            (Tag `devcontainer-v${{ env.VERSION }}`, [Workflow-Lauf](${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }})).
 
             Dieser Pull Request stellt `.devcontainer/devcontainer.json` auf die neue Version um. Nach dem Merge
             - verwenden **alle CI-Jobs** das neue Image (sie lesen die Version aus `devcontainer.json`),
