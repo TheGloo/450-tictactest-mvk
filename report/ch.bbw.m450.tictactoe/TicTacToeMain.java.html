@@ -24,7 +24,7 @@ import ch.bbw.m450.tictactoe.players.HumanPlayer;
 	 */
 	public static boolean isWin(Stone[] b, Stone color) {
 		// @formatter:off
-<span class="pc bpc" id="L27" title="4 of 48 branches missed.">		return  b[0] == color &amp;&amp; b[0] == b[1] &amp;&amp; b[1] == b[2] ||</span>
+<span class="fc bfc" id="L27" title="All 48 branches covered.">		return  b[0] == color &amp;&amp; b[0] == b[1] &amp;&amp; b[1] == b[2] ||</span>
 				b[3] == color &amp;&amp; b[3] == b[4] &amp;&amp; b[4] == b[5] ||
 				b[6] == color &amp;&amp; b[6] == b[7] &amp;&amp; b[7] == b[8] ||
 				b[0] == color &amp;&amp; b[0] == b[3] &amp;&amp; b[3] == b[6] ||
@@ -71,7 +71,7 @@ import ch.bbw.m450.tictactoe.players.HumanPlayer;
 		}
 <span class="fc" id="L72">		var board = new Stone[BOARD_SIZE]; // all null -&gt; empty</span>
 <span class="fc" id="L73">		var currentPlayer = xPlayer;</span>
-<span class="pc bpc" id="L74" title="1 of 2 branches missed.">		for (var round = 0; round &lt; BOARD_SIZE; round++) { // it lasts for 9 rounds</span>
+<span class="fc bfc" id="L74" title="All 2 branches covered.">		for (var round = 0; round &lt; BOARD_SIZE; round++) { // it lasts for 9 rounds</span>
 <span class="fc bfc" id="L75" title="All 2 branches covered.">			var currentColor = currentPlayer == xPlayer ? Stone.CROSS : Stone.CIRCLE;</span>
 			// we copy to avoid side effects by the player (not needed if they behave)
 <span class="fc" id="L77">			var clone = Arrays.copyOf(board, board.length);</span>
@@ -87,8 +87,8 @@ import ch.bbw.m450.tictactoe.players.HumanPlayer;
 			}
 <span class="fc bfc" id="L88" title="All 2 branches covered.">			currentPlayer = currentPlayer == xPlayer ? oPlayer : xPlayer;</span>
 		}
-<span class="nc" id="L90">		System.out.println(&quot;it's a draw!&quot;);</span>
-<span class="nc" id="L91">		return null;</span>
+<span class="fc" id="L90">		System.out.println(&quot;it's a draw!&quot;);</span>
+<span class="fc" id="L91">		return null;</span>
 	}
 
 }
