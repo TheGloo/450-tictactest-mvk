@@ -88,6 +88,63 @@ jobs:
           path: build/libs/*.jar
           if-no-files-found: error
 
+  mutation:
+    name: Mutation Testing (PIT)
+    needs: image
+    runs-on: ubuntu-latest
+    container:
+      image: ${{ needs.image.outputs.image }}
+      options: --user root
+      credentials:
+        username: ${{ github.actor }}
+        password: ${{ secrets.GITHUB_TOKEN }}
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up Gradle
+        uses: gradle/actions/setup-gradle@v4
+
+      # fails if the mutation score drops below mutationThreshold in build.gradle
+      - name: Run mutation tests
+        run: ./gradlew pitest --stacktrace
+
+      - name: Mutation summary
+        if: always()
+        run: |
+          xml=build/reports/pitest/mutations.xml
+          if [ ! -f "$xml" ]; then
+            echo "### ❌ Mutation Testing: kein Report erzeugt" >> "$GITHUB_STEP_SUMMARY"
+            exit 0
+          fi
+          total=$(grep -o "<mutation " "$xml" | wc -l)
+          killed=$(grep -o "status='KILLED'" "$xml" | wc -l)
+          survived=$(grep -o "status='SURVIVED'" "$xml" | wc -l)
+          nocov=$(grep -o "status='NO_COVERAGE'" "$xml" | wc -l)
+          score=$(( total > 0 ? killed * 100 / total : 0 ))
+          echo "Mutation score: $score % ($killed of $total killed)"
+          {
+            echo "### Mutation Testing (PIT) – \`${GITHUB_REF_NAME}\`"
+            echo
+            echo "| Metrik | Wert |"
+            echo "|---|---:|"
+            echo "| **Mutation Score** | **$score %** |"
+            echo "| Mutanten | $total |"
+            echo "| getötet | $killed |"
+            echo "| überlebt | $survived |"
+            echo "| ohne Coverage | $nocov |"
+            echo
+            echo "Der vollständige HTML-Report liegt im Artefakt **mutation-report**."
+          } >> "$GITHUB_STEP_SUMMARY"
+
+      - name: Upload mutation report
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: mutation-report
+          path: build/reports/pitest
+          if-no-files-found: ignore
+
   coverage-pages:
     name: Coverage time series (GitHub Pages)
     needs: build

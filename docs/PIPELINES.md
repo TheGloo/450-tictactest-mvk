@@ -10,7 +10,7 @@ Stand **22.09.2026**. Beschrieben ist der IST-Zustand der Dateien unter
 
 | # | Pipeline | Datei | Auslöser | Ergebnis |
 |---|---|---|---|---|
-| 1 | **CI** | [`ci.yml`](../.github/workflows/ci.yml) | Push auf jeden Branch, PR auf `main`, manuell | Build + Tests + Coverage; Artefakte `coverage-report`, `test-report`, `tictactoe-jar`; auf `main` zusätzlich die Coverage Time-Series auf GitHub Pages |
+| 1 | **CI** | [`ci.yml`](../.github/workflows/ci.yml) | Push auf jeden Branch, PR auf `main`, manuell | Build + Tests + Coverage + Mutation Testing; Artefakte `coverage-report`, `test-report`, `tictactoe-jar`, `mutation-report`; auf `main` zusätzlich die Coverage Time-Series auf GitHub Pages |
 | 2 | **Coverage Gate** | [`coverage-gate.yml`](../.github/workflows/coverage-gate.yml) | PR auf `main` geöffnet/aktualisiert, manuell | PASS/FAIL: Coverage des Branches ≥ Coverage von `main` |
 | 3 | **Release** | [`release.yml`](../.github/workflows/release.yml) | Push eines Tags `v*` | GitHub Release mit angehängtem JAR |
 | 4 | **DevContainer** | [`devcontainer.yml`](../.github/workflows/devcontainer.yml) | Änderung am Image (PR, `main`), Tag `devcontainer-v*` | getestetes Image; bei einem Tag: veröffentlichte Version in GHCR + Pull Request, der sie einsetzt |
@@ -58,6 +58,7 @@ auf `main` die Coverage Time-Series.
 |---|---|---|
 | `image` – *DevContainer image* | `ubuntu-latest` | liest die Image-Version aus `devcontainer.json` |
 | `build` – *Build, Test & Coverage* | DevContainer-Image (`--user root`) | `./gradlew build` (Tests + JaCoCo), Coverage-Tabelle in der Zusammenfassung, Artefakte hochladen; Output `coverage` (Line Coverage) |
+| `mutation` – *Mutation Testing (PIT)* | DevContainer-Image (`--user root`), parallel zu `build` | `./gradlew pitest`, schlägt unter 90 % Mutation Score fehl; Score-Tabelle in der Zusammenfassung, Artefakt `mutation-report` (siehe [MUTATIONTESTING.md](MUTATIONTESTING.md)) |
 | `coverage-pages` – *Coverage time series* | `ubuntu-latest`, **nur bei Push auf `main`** | Artefakt `coverage-report` laden, eigene Action `coverage-timeseries` aufrufen → Zeile an `coverage-history.csv` auf `gh-pages` anhängen, Report + Seite aktualisieren, pushen |
 
 **Artefakte**

@@ -28,4 +28,13 @@ public final class TestPlayers {
 	public static TicTacToePlayer alwaysPlayingTo(int position) {
 		return (board, colorToPlay) -> position;
 	}
+
+	/**
+	 * A scripted player that makes the given moves in order, so a test can replay a complete
+	 * game. Once the script is used up it plays to {@code -1}, which the game rejects.
+	 */
+	public static TicTacToePlayer playingInOrder(int... positions) {
+		var next = new int[1];
+		return (board, colorToPlay) -> next[0] < positions.length ? positions[next[0]++] : -1;
+	}
 }

@@ -3,8 +3,10 @@ package ch.bbw.m450.tictactoe;
 import static ch.bbw.m450.tictactoe.testsupport.BoardAssert.assertThatBoard;
 import static ch.bbw.m450.tictactoe.testsupport.Boards.DRAW;
 import static ch.bbw.m450.tictactoe.testsupport.Boards.EMPTY;
+import static ch.bbw.m450.tictactoe.testsupport.Boards.board;
 import static ch.bbw.m450.tictactoe.testsupport.TestPlayers.alwaysPlayingTo;
 import static ch.bbw.m450.tictactoe.testsupport.TestPlayers.greedy;
+import static ch.bbw.m450.tictactoe.testsupport.TestPlayers.playingInOrder;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
@@ -36,11 +38,43 @@ class TicTacToeMainTest {
 			assertThatBoard(pattern).isWonBy(Stone.CROSS);
 		}
 
+		@ParameterizedTest(name = "{0}")
+		@DisplayName("detects all three rows, columns and diagonals of CIRCLE")
+		@MethodSource("ch.bbw.m450.tictactoe.testsupport.Boards#winningLinesForCircle")
+		void detectsEveryWinningLineOfCircle(String line, String pattern) {
+			assertThatBoard(pattern).isWonBy(Stone.CIRCLE);
+		}
+
+		@ParameterizedTest(name = "{0}")
+		@DisplayName("is false when one field of the line holds the other colour")
+		@MethodSource("ch.bbw.m450.tictactoe.testsupport.Boards#nearlyWinningLinesForCross")
+		void isFalseForTwoInALine(String line, String pattern) {
+			assertThatBoard(pattern).hasNoWinner();
+		}
+
 		@Test
 		@DisplayName("is false for an empty board and for a full board without a line")
 		void isFalseWithoutThreeInALine() {
 			assertThatBoard(EMPTY).hasNoWinner();
 			assertThatBoard(DRAW).hasNoWinner();
+		}
+	}
+
+	@Nested
+	@DisplayName("toString")
+	class ToString {
+
+		private static final String BOLD = "\033[1m";
+		private static final String GREY = "\033[37m";
+		private static final String RESET = "\033[0m";
+
+		@Test
+		@DisplayName("renders stones in bold and empty fields as their grey index, three per line")
+		void rendersTheBoard() {
+			var expected = BOLD + "X" + RESET + "  " + GREY + "1" + RESET + "  " + BOLD + "O" + RESET + "  \n"
+					+ GREY + "3" + RESET + "  " + BOLD + "X" + RESET + "  " + GREY + "5" + RESET + "  \n"
+					+ GREY + "6" + RESET + "  " + GREY + "7" + RESET + "  " + BOLD + "O" + RESET + "  \n";
+			assertThat(TicTacToeMain.toString(board("X.O.X...O"))).isEqualTo(expected);
 		}
 	}
 
@@ -62,6 +96,22 @@ class TicTacToeMainTest {
 		}
 
 		@Test
+		@DisplayName("lets CIRCLE win and announces it")
+		void circleCanWin() {
+			// X:0 O:3 X:1 O:4 X:8 O:5 -> CIRCLE holds the middle row
+			assertThat(TicTacToeMain.play(playingInOrder(0, 1, 8), playingInOrder(3, 4, 5))).isEqualTo(Stone.CIRCLE);
+			assertThat(console.output()).contains("...and the winner is: " + Stone.CIRCLE);
+		}
+
+		@Test
+		@DisplayName("ends in a draw after nine moves without a line")
+		void fullBoardWithoutLineIsADraw() {
+			// X:0 O:1 X:2 O:4 X:3 O:5 X:7 O:6 X:8 -> the DRAW board
+			assertThat(TicTacToeMain.play(playingInOrder(0, 2, 3, 7, 8), playingInOrder(1, 4, 5, 6))).isNull();
+			assertThat(console.output()).contains("it's a draw!");
+		}
+
+		@Test
 		@DisplayName("refuses to run a player against itself")
 		void rejectsTheSamePlayerTwice() {
 			var player = greedy();
@@ -77,6 +127,8 @@ class TicTacToeMainTest {
 			assertThatThrownBy(() -> TicTacToeMain.play(greedy(), alwaysPlayingTo(position)))
 					.isInstanceOf(IllegalStateException.class)
 					.hasMessage("cannot play to position " + position);
+			// the board as it was before the invalid move is shown to the players
+			assertThat(console.output()).contains(TicTacToeMain.toString(board("X........")));
 		}
 	}
 }

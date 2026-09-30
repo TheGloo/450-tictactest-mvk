@@ -90,4 +90,31 @@ public final class Boards {
 				Arguments.of("main diagonal", "X...X...X"),
 				Arguments.of("anti diagonal", "..X.X.X.."));
 	}
+
+	/** The same eight lines as {@link #winningLinesForCross()}, held by CIRCLE. */
+	public static Stream<Arguments> winningLinesForCircle() {
+		return winningLinesForCross().map(Arguments::get)
+				.map(args -> Arguments.of(args[0], ((String) args[1]).replace('X', 'O')));
+	}
+
+	/**
+	 * Fixture for a parameterized test: every winning line of CROSS with one of its three
+	 * fields taken by CIRCLE instead, so CROSS has two in a line but no win. 8 lines x 3
+	 * positions = 24 boards.
+	 */
+	public static Stream<Arguments> nearlyWinningLinesForCross() {
+		return winningLinesForCross().map(Arguments::get)
+				.flatMap(args -> blockEachCross((String) args[0], (String) args[1]));
+	}
+
+	private static Stream<Arguments> blockEachCross(String line, String pattern) {
+		var blocked = Stream.<Arguments>builder();
+		for (var i = 0; i < pattern.length(); i++) {
+			if (pattern.charAt(i) == 'X') {
+				var board = pattern.substring(0, i) + 'O' + pattern.substring(i + 1);
+				blocked.add(Arguments.of(line + ", field " + i + " blocked", board));
+			}
+		}
+		return blocked.build();
+	}
 }

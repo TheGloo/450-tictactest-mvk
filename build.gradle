@@ -1,6 +1,7 @@
 plugins {
 	id 'java'
 	id 'jacoco'
+	id 'info.solidsoft.pitest' version '1.19.0'
 }
 
 repositories {
@@ -45,4 +46,26 @@ jacocoTestReport {
 		xml.required = true
 		csv.required = true
 	}
+}
+
+// Mutation testing with PIT (https://pitest.org): ./gradlew pitest
+// PIT changes the compiled code in small ways (mutants, e.g. `==` -> `!=`) and runs
+// the tests against each one. A mutant the tests do not notice "survives" and points
+// to a gap in the assertions that line coverage cannot show.
+// Report in build/reports/pitest/: index.html (human readable), mutations.xml
+pitest {
+	pitestVersion = '1.30.0'
+	junit5PluginVersion = '1.2.3'
+	targetClasses = ['ch.bbw.m450.tictactoe.*']
+	targetTests = ['ch.bbw.m450.tictactoe.*']
+	// main() and HumanPlayer read from System.in - not meaningful to mutate
+	excludedMethods = ['main']
+	excludedClasses = ['ch.bbw.m450.tictactoe.players.HumanPlayer']
+	mutators = ['STRONGER']
+	outputFormats = ['HTML', 'XML']
+	timestampedReports = false
+	exportLineCoverage = true
+	threads = Runtime.runtime.availableProcessors()
+	// the build fails if fewer than 90 % of the mutants are killed (currently 100 %)
+	mutationThreshold = 90
 }
