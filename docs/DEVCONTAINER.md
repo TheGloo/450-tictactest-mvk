@@ -22,7 +22,7 @@ Image: **`ghcr.io/thegloo/450-tictactest-mvk`** (öffentlich)
 | Bestandteil | Details |
 |---|---|
 | **Java 25** | Azul Zulu, also genau der Hersteller, auf den der Gradle-Daemon gepinnt ist (`gradle/gradle-daemon-jvm.properties`). Gradle lädt keine Toolchain herunter. |
-| **Gradle** | Die Distribution des Wrappers (`9.7.0`) ist vorab im Image und zusätzlich als `gradle` im `PATH`. Alle Projekt-Abhängigkeiten (JUnit, AssertJ, JaCoCo) liegen bereits im Cache `GRADLE_USER_HOME=/opt/gradle-home`. |
+| **Gradle** | Die Distribution des Wrappers (`9.8.2`) ist vorab im Image und zusätzlich als `gradle` im `PATH`. Alle Projekt-Abhängigkeiten (JUnit, AssertJ, Pioneer, jqwik, JaCoCo, PIT) liegen bereits im Cache `GRADLE_USER_HOME=/opt/gradle-home`. |
 | **JUnit** | JUnit 5 über Gradle; zusätzlich der *JUnit Platform Console Launcher* als Befehl `junit` |
 | **Benutzer** | `dev` mit **UID:GID 1000:1000**, Standardbenutzer des Images |
 | **Werkzeuge** | `bash`, `git`, `ssh`, `curl`, `gh` (GitHub CLI) |

@@ -63,6 +63,8 @@ jobs:
             echo "| Branch | $branch % |"
             echo "| Instruction | $instruction % |"
             echo
+            echo "Branch-Coverage ≥ 90 % wird von \`jacocoTestCoverageVerification\` erzwungen (Teil von \`./gradlew build\`)."
+            echo
             echo "Der vollständige HTML-Report liegt im Artefakt **coverage-report**."
           } >> "$GITHUB_STEP_SUMMARY"
 

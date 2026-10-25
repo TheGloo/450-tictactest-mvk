@@ -1,7 +1,7 @@
 # Pipelines – Übersicht (M450)
 
 Dokumentation aller GitHub-Actions-Workflows im Projekt `450-tictactest-mvk`,
-Stand **22.09.2026**. Beschrieben ist der IST-Zustand der Dateien unter
+Stand **25.10.2026**. Beschrieben ist der IST-Zustand der Dateien unter
 [`.github/workflows/`](../.github/workflows/).
 
 ---
@@ -57,13 +57,14 @@ auf `main` die Coverage Time-Series.
 | Job | Läuft in | Aufgabe |
 |---|---|---|
 | `image` – *DevContainer image* | `ubuntu-latest` | liest die Image-Version aus `devcontainer.json` |
-| `build` – *Build, Test & Coverage* | DevContainer-Image (`--user root`) | `./gradlew build` (Tests + JaCoCo), Coverage-Tabelle in der Zusammenfassung, Artefakte hochladen; Output `coverage` (Line Coverage) |
+| `build` – *Build, Test & Coverage* | DevContainer-Image (`--user root`) | `./gradlew build` (Tests + JaCoCo-Report + Coverage Verification: **Branch ≥ 90 %**, sonst rot), Coverage-Tabelle in der Zusammenfassung, Artefakte hochladen; Output `coverage` (Line Coverage) |
 | `mutation` – *Mutation Testing (PIT)* | DevContainer-Image (`--user root`), parallel zu `build` | `./gradlew pitest`, schlägt unter 90 % Mutation Score fehl; Score-Tabelle in der Zusammenfassung, Artefakt `mutation-report` (siehe [MUTATIONTESTING.md](MUTATIONTESTING.md)) |
 | `coverage-pages` – *Coverage time series* | `ubuntu-latest`, **nur bei Push auf `main`** | Artefakt `coverage-report` laden, eigene Action `coverage-timeseries` aufrufen → Zeile an `coverage-history.csv` auf `gh-pages` anhängen, Report + Seite aktualisieren, pushen |
 
 **Artefakte**
 
 - `coverage-report` – HTML-Report von JaCoCo
+- `mutation-report` – HTML- und XML-Report von PIT
 - `test-report` – HTML-Testreport, auch bei roten Tests (`if: always()`)
 - `tictactoe-jar` – das gebaute, lauffähige JAR
 

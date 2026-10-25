@@ -11,18 +11,21 @@ import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
 import ch.bbw.m450.tictactoe.TicTacToePlayer.Stone;
-import ch.bbw.m450.tictactoe.testsupport.ConsoleCapture;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Nested;
 import org.junit.jupiter.api.Test;
-import org.junit.jupiter.api.extension.RegisterExtension;
 import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.MethodSource;
 import org.junit.jupiter.params.provider.ValueSource;
+import org.junitpioneer.jupiter.StdIo;
+import org.junitpioneer.jupiter.StdOut;
 
 /**
  * Tests for the game rules. Boards, player doubles and the board assertions live in
  * {@link ch.bbw.m450.tictactoe.testsupport}, so every test here reads as one scenario.
+ *
+ * <p>Everything the game prints is captured with JUnit Pioneer's {@link StdIo}: that keeps
+ * the boards out of the build output and lets a test assert on what the game reported.
  */
 @DisplayName("TicTacToeMain")
 class TicTacToeMainTest {
@@ -82,33 +85,32 @@ class TicTacToeMainTest {
 	@DisplayName("play")
 	class Play {
 
-		/** Keeps the board that the game loop prints out of the build output. */
-		@RegisterExtension
-		final ConsoleCapture console = new ConsoleCapture();
-
 		@Test
+		@StdIo
 		@DisplayName("lets CROSS win on 2-4-6 when two greedy players meet")
-		void twoGreedyPlayersLetCrossWin() {
+		void twoGreedyPlayersLetCrossWin(StdOut out) {
 			// both players always take the first free field, so the moves are
 			// X:0 O:1 X:2 O:3 X:4 O:5 X:6 -> CROSS holds the anti-diagonal 2-4-6
 			assertThat(TicTacToeMain.play(greedy(), greedy())).isEqualTo(Stone.CROSS);
-			assertThat(console.output()).contains("...and the winner is: " + Stone.CROSS);
+			assertThat(out.capturedString()).contains("...and the winner is: " + Stone.CROSS);
 		}
 
 		@Test
+		@StdIo
 		@DisplayName("lets CIRCLE win and announces it")
-		void circleCanWin() {
+		void circleCanWin(StdOut out) {
 			// X:0 O:3 X:1 O:4 X:8 O:5 -> CIRCLE holds the middle row
 			assertThat(TicTacToeMain.play(playingInOrder(0, 1, 8), playingInOrder(3, 4, 5))).isEqualTo(Stone.CIRCLE);
-			assertThat(console.output()).contains("...and the winner is: " + Stone.CIRCLE);
+			assertThat(out.capturedString()).contains("...and the winner is: " + Stone.CIRCLE);
 		}
 
 		@Test
+		@StdIo
 		@DisplayName("ends in a draw after nine moves without a line")
-		void fullBoardWithoutLineIsADraw() {
+		void fullBoardWithoutLineIsADraw(StdOut out) {
 			// X:0 O:1 X:2 O:4 X:3 O:5 X:7 O:6 X:8 -> the DRAW board
 			assertThat(TicTacToeMain.play(playingInOrder(0, 2, 3, 7, 8), playingInOrder(1, 4, 5, 6))).isNull();
-			assertThat(console.output()).contains("it's a draw!");
+			assertThat(out.capturedString()).contains("it's a draw!");
 		}
 
 		@Test
@@ -120,15 +122,32 @@ class TicTacToeMainTest {
 		}
 
 		@ParameterizedTest(name = "playing to position {0} is rejected")
+		@StdIo
 		@DisplayName("rejects moves outside the board and onto occupied fields")
 		@ValueSource(ints = {-1, 9, 0}) // out of range low, out of range high, already taken by CROSS
-		void rejectsInvalidMoves(int position) {
+		void rejectsInvalidMoves(int position, StdOut out) {
 			// the greedy CROSS player opens on field 0, then the cheating CIRCLE player moves
 			assertThatThrownBy(() -> TicTacToeMain.play(greedy(), alwaysPlayingTo(position)))
 					.isInstanceOf(IllegalStateException.class)
 					.hasMessage("cannot play to position " + position);
 			// the board as it was before the invalid move is shown to the players
-			assertThat(console.output()).contains(TicTacToeMain.toString(board("X........")));
+			assertThat(out.capturedString()).contains(TicTacToeMain.toString(board("X........")));
+		}
+	}
+
+	@Nested
+	@DisplayName("main")
+	class Main {
+
+		@Test
+		@StdIo("9")
+		@DisplayName("lets a human play CROSS against the greedy player")
+		void humanPlaysCrossAgainstTheGreedyPlayer(StdOut out) {
+			// the human's first move is invalid on purpose and ends the game at once;
+			// that is enough to prove that main asks the console player to move as CROSS
+			assertThatThrownBy(() -> TicTacToeMain.main(new String[0])).isInstanceOf(IllegalStateException.class)
+					.hasMessage("cannot play to position 9");
+			assertThat(out.capturedString()).contains("where to to put the next " + Stone.CROSS + "? (0-8):");
 		}
 	}
 }

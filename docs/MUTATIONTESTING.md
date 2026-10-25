@@ -25,8 +25,7 @@ in [`build.gradle`](../build.gradle) eingebunden:
 | `pitestVersion` | `1.30.0` | aktuelle Version, läuft mit Java 25 |
 | `junit5PluginVersion` | `1.2.3` | PIT führt die JUnit-5-Tests aus |
 | `targetClasses` / `targetTests` | `ch.bbw.m450.tictactoe.*` | ganzer Produktivcode, alle Tests |
-| `excludedClasses` | `HumanPlayer` | liest von `System.in`, nicht sinnvoll testbar |
-| `excludedMethods` | `main` | startet nur ein Spiel mit dem `HumanPlayer` |
+| `excludedTestClasses` | `*Properties` | die jqwik-Properties arbeiten mit Zufallseingaben; die Mutanten werden von den deterministischen JUnit-Tests getötet, so bleibt PIT reproduzierbar und schnell |
 | `mutators` | `STRONGER` | Standardmutatoren plus *Remove Conditionals* (z. B. `a == b` → `true`/`false`) |
 | `mutationThreshold` | `90` | der Build schlägt fehl, wenn der Score unter 90 % fällt |
 | `outputFormats` | `HTML`, `XML` | Report für Menschen und für die Zusammenfassung in der CI |
@@ -106,10 +105,49 @@ Ergebnis:
 
 ---
 
-## 4. Schwellenwert
+## 4. Zweiter Durchgang: Konsolenspieler, `main` und `PerfectPlayer`
 
-Der Schwellenwert liegt bewusst bei **90 %** und nicht bei 100 %: Bei neuem Code können
-*äquivalente Mutanten* entstehen, also Änderungen, die das Verhalten gar nicht
-verändern und darum von keinem Test getötet werden können. Diese sollen den Build nicht
-blockieren. Ein deutlicher Rückgang, zum Beispiel neuer Code ohne aussagekräftige
+Mit JUnit Pioneer wurden `HumanPlayer` und `main` testbar und sind seither nicht mehr von
+PIT ausgenommen; dazu kam der neue `PerfectPlayer`. Stand 25.10.2026:
+
+```
+>> Generated 137 mutations Killed 131 (96%)
+```
+
+| Klasse | Mutanten | getötet |
+|---|---:|---:|
+| `TicTacToeMain` | 85 | 85 |
+| `PerfectPlayer` | 41 | 35 |
+| `GreedyPlayer` | 6 | 6 |
+| `TicTacToePlayer.Stone` | 3 | 3 |
+| `HumanPlayer` | 2 | 2 |
+| **Total** | **137** | **131 (96 %)** |
+
+### Die sechs überlebenden Mutanten sind äquivalent
+
+Ein *äquivalenter Mutant* verändert den Code, aber nicht das beobachtbare Verhalten.
+Kein Test kann ihn töten, und er zeigt keine Lücke in den Tests:
+
+| Stelle in `PerfectPlayer` | Mutation | Warum äquivalent |
+|---|---|---|
+| `key`, `code * 3 + digit` | `+` → `-` | Die Kodierung mit negativen Ziffern ist genauso eindeutig, der Cache funktioniert unverändert. |
+| `key`, `code * 2 + colorBit` | `+` → `-` | ebenso: gerade und ungerade Schlüssel bleiben getrennt |
+| `key`, `color == CROSS` | → `true` bzw. `false` (2 Mutanten) | Das Farbbit fällt weg. Auf erreichbaren Brettern ist die Farbe am Zug durch die Steinzahl bestimmt; dieselbe Stellung kommt nie mit beiden Farben vor, der Cache kollidiert nicht. |
+| `play`, `score > bestScore` | → `>=` | Bei gleich guten Zügen wird der letzte statt der erste gewählt; beide sind perfekte Züge. |
+| `score`, `known != null` | → `false` | Der Cache wird nie gelesen. Nur langsamer, gleiches Ergebnis. |
+
+Drei weitere Mutanten in der Tiefenbewertung (`if (best > 0) … if (best < 0) …`) waren
+anfangs ebenfalls übrig geblieben. Statt sie als äquivalent zu akzeptieren, wurde der
+Code zu `best - Integer.signum(best)` vereinfacht: weniger Verzweigungen, weniger
+Mutanten, und der verbleibende Mutant (`-` → `+`) wird von `prefersTheFasterWin`
+getötet. Mutation Testing hat hier also auch den Produktivcode verbessert.
+
+---
+
+## 5. Schwellenwert
+
+Der Schwellenwert liegt bewusst bei **90 %** und nicht bei 100 %: Wie Kapitel 4 zeigt,
+entstehen bei neuem Code *äquivalente Mutanten*, also Änderungen, die das Verhalten gar
+nicht verändern und darum von keinem Test getötet werden können. Diese sollen den Build
+nicht blockieren. Ein deutlicher Rückgang, zum Beispiel neuer Code ohne aussagekräftige
 Assertions, lässt die CI dagegen fehlschlagen.

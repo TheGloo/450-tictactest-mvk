@@ -18,7 +18,7 @@ LABEL org.opencontainers.image.description="Alpine DevContainer/CI image for the
 ARG USERNAME=dev
 ARG USER_UID=1000
 ARG USER_GID=1000
-ARG JUNIT_PLATFORM_VERSION=1.14.0
+ARG JUNIT_PLATFORM_VERSION=6.1.3
 
 # bash, git, openssh-client  VS Code und actions/checkout
 # libstdc++, libgcc          VS Code Server und das Node.js des Actions-Runners (musl-Build)
@@ -32,7 +32,7 @@ RUN apk add --no-cache \
 
 # JUnit: Console Launcher, um Tests auch ohne Gradle starten zu können
 # (junit --class-path build/classes/java/test:build/classes/java/main --scan-class-path).
-# Die Version gehört zur junit-bom 5.14.0 aus build.gradle.
+# Die Version gehört zur junit-bom 6.1.3 aus build.gradle.
 RUN mkdir -p /opt/junit \
 	&& curl -fsSL -o /opt/junit/junit-platform-console-standalone.jar \
 		"https://repo1.maven.org/maven2/org/junit/platform/junit-platform-console-standalone/${JUNIT_PLATFORM_VERSION}/junit-platform-console-standalone-${JUNIT_PLATFORM_VERSION}.jar" \
@@ -40,8 +40,8 @@ RUN mkdir -p /opt/junit \
 	&& chmod +x /usr/local/bin/junit
 
 # Gradle: Wrapper-Distribution und alle Projekt-Abhängigkeiten (JUnit, AssertJ,
-# JaCoCo) vorab ins Image laden. Der Wrapper-Download wird zugleich als globales
-# "gradle" verlinkt, damit beide dieselbe Version sind.
+# Pioneer, jqwik, JaCoCo, PIT) vorab ins Image laden. Der Wrapper-Download wird
+# zugleich als globales "gradle" verlinkt, damit beide dieselbe Version sind.
 ENV GRADLE_USER_HOME=/opt/gradle-home
 WORKDIR /tmp/warmup
 COPY gradlew settings.gradle build.gradle gradle.properties ./

@@ -5,7 +5,7 @@ gemessen, über die Zeit verfolgt und bei Pull Requests abgesichert wird.
 
 | Auftrag | Inhalt | Umsetzung |
 |---|---|---|
-| 1 | Coverage Report für jeden Branch | JaCoCo in [`build.gradle`](../build.gradle), Artefakt `coverage-report` in [`ci.yml`](../.github/workflows/ci.yml) |
+| 1 | Coverage Report für jeden Branch | JaCoCo in [`build.gradle`](../build.gradle), Artefakt `coverage-report` in [`ci.yml`](../.github/workflows/ci.yml); `jacocoTestCoverageVerification` erzwingt **≥ 90 % Branch-Coverage** |
 | 2 | Design der Coverage Time-Series | [Kapitel 2](#2-auftrag-2-design-der-coverage-time-series) |
 | 2.5 | Implementation der Time-Series auf GitHub Pages | Job `coverage-pages` in `ci.yml` + eigene Action [`coverage-timeseries`](../.github/actions/coverage-timeseries/action.yml) (Bonus) |
 | 3 | Coverage Gate für Pull Requests | [`coverage-gate.yml`](../.github/workflows/coverage-gate.yml) |
@@ -33,6 +33,40 @@ jeder Testlauf erzeugt also automatisch den Report:
 | `build/reports/jacoco/test/jacocoTestReport.csv` | Grundlage für Time-Series und Gate (eine Zeile pro Klasse) |
 | `build/reports/jacoco/test/jacocoTestReport.xml` | Standardformat für Werkzeuge (z. B. *Coverage Gutters* im DevContainer) |
 
+### Coverage Verification: 90 % Branch-Coverage erzwungen
+
+Neben dem Report prüft `jacocoTestCoverageVerification` die gemessene Coverage gegen
+eine Mindestgrenze. Der Task hängt an `check` und damit an `./gradlew build`:
+
+```groovy
+jacocoTestCoverageVerification {
+	dependsOn test
+	violationRules {
+		rule {
+			limit {
+				counter = 'BRANCH'
+				value = 'COVEREDRATIO'
+				minimum = 0.90
+			}
+		}
+	}
+}
+check.dependsOn jacocoTestCoverageVerification
+```
+
+Fällt die **Branch-Coverage** unter 90 %, schlägt der Build lokal und in der CI fehl:
+
+```
+Rule violated for bundle tictactoe: branches covered ratio is 0.85, but expected minimum is 0.90
+```
+
+Branch-Coverage ist die strengere Metrik: Eine Zeile wie
+`if (playTo < 0 || playTo >= 9 || board[playTo] != null)` gilt als abgedeckt, sobald
+sie einmal ausgeführt wurde; Branch-Coverage verlangt, dass jede Bedingung einmal wahr
+und einmal falsch war. Stand 25.10.2026: **104 von 104 Branches (100 %)**, Line-Coverage
+80 von 83 Zeilen (96 %; es fehlen der implizite Konstruktor von `TicTacToeMain` und die
+zwei Zeilen von `main`, siehe [TESTKONZEPT.md](TESTKONZEPT.md), Kapitel 4.3).
+
 ### In der Pipeline
 
 Der CI-Workflow läuft bei **jedem Push auf jeden Branch**, bei Pull Requests auf
@@ -52,6 +86,7 @@ Der CI-Workflow läuft bei **jedem Push auf jeden Branch**, bei Pull Requests au
 | ein Coverage Report wird erstellt | `jacocoTestReport` (HTML, XML, CSV) |
 | der Report entsteht für jeden Branch | Trigger `push: branches-ignore: [gh-pages]` |
 | der HTML-Report ist als Artefakt verfügbar | Artefakt `coverage-report` |
+| eine Coverage Verification erzwingt 90 % Branch-Coverage | `jacocoTestCoverageVerification` in `build.gradle`, Teil von `./gradlew build` (lokal und in der CI) |
 
 ---
 
