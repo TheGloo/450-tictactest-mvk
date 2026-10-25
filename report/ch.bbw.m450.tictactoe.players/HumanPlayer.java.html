@@ -9,13 +9,13 @@ import ch.bbw.m450.tictactoe.TicTacToePlayer;
 /**
  * Simple human-player taking input from stdin.
  */
-<span class="nc" id="L12">public class HumanPlayer implements TicTacToePlayer {</span>
+<span class="fc" id="L12">public class HumanPlayer implements TicTacToePlayer {</span>
 
 	@Override
 	public int play(Stone[] board, Stone colorToPlay) {
-<span class="nc" id="L16">		System.out.println(TicTacToeMain.toString(board) + &quot;where to to put the next &quot; + colorToPlay + &quot;? (0-8): &quot;);</span>
-<span class="nc" id="L17">		var scanner = new Scanner(System.in, StandardCharsets.UTF_8);</span>
-<span class="nc" id="L18">		return Integer.parseInt(scanner.nextLine());</span>
+<span class="fc" id="L16">		System.out.println(TicTacToeMain.toString(board) + &quot;where to to put the next &quot; + colorToPlay + &quot;? (0-8): &quot;);</span>
+<span class="fc" id="L17">		var scanner = new Scanner(System.in, StandardCharsets.UTF_8);</span>
+<span class="fc" id="L18">		return Integer.parseInt(scanner.nextLine());</span>
 	}
 }
 </pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.15.202606040825</span></div></body></html>

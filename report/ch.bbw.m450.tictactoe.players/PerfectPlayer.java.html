@@ -1,0 +1,96 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>PerfectPlayer.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">tictactoe</a> &gt; <a href="index.source.html" class="el_package">ch.bbw.m450.tictactoe.players</a> &gt; <span class="el_source">PerfectPlayer.java</span></div><h1>PerfectPlayer.java</h1><pre class="source lang-java linenums">package ch.bbw.m450.tictactoe.players;
+
+import java.util.HashMap;
+import java.util.Map;
+
+import ch.bbw.m450.tictactoe.TicTacToeMain;
+import ch.bbw.m450.tictactoe.TicTacToePlayer;
+
+/**
+ * A player that never loses: it searches the complete game tree (minimax in its negamax
+ * form) and plays the move with the best guaranteed outcome. Among equally good moves it
+ * prefers the one that wins soonest, or loses latest.
+ *
+ * &lt;p&gt;A 3x3 board has only 5478 reachable positions, so every position is evaluated once
+ * and remembered. Afterwards a move costs a handful of map lookups.
+ */
+<span class="fc" id="L17">public class PerfectPlayer implements TicTacToePlayer {</span>
+
+	/** Score of a position that is already won; one point is deducted per move it is away. */
+	private static final int WIN = 10;
+
+	private static final int DRAW = 0;
+
+	/** position (see {@link #key}) -&gt; score for the colour that is about to move there */
+<span class="fc" id="L25">	private final Map&lt;Integer, Integer&gt; scores = new HashMap&lt;&gt;();</span>
+
+	@Override
+	public int play(Stone[] board, Stone colorToPlay) {
+<span class="fc" id="L29">		var position = board.clone(); // the search puts stones down and takes them back</span>
+<span class="fc" id="L30">		var bestMove = -1;</span>
+<span class="fc" id="L31">		var bestScore = Integer.MIN_VALUE;</span>
+<span class="fc bfc" id="L32" title="All 2 branches covered.">		for (var i = 0; i &lt; position.length; i++) {</span>
+<span class="fc bfc" id="L33" title="All 2 branches covered.">			if (position[i] == null) {</span>
+<span class="fc" id="L34">				var score = scoreOfMove(position, i, colorToPlay);</span>
+<span class="fc bfc" id="L35" title="All 2 branches covered.">				if (score &gt; bestScore) {</span>
+<span class="fc" id="L36">					bestScore = score;</span>
+<span class="fc" id="L37">					bestMove = i;</span>
+				}
+			}
+		}
+<span class="fc bfc" id="L41" title="All 2 branches covered.">		if (bestMove &lt; 0) {</span>
+<span class="fc" id="L42">			throw new IllegalStateException(&quot;cannot play at all&quot;);</span>
+		}
+<span class="fc" id="L44">		return bestMove;</span>
+	}
+
+	/** Plays {@code color} to {@code field}, scores the result for {@code color} and undoes the move. */
+	private int scoreOfMove(Stone[] position, int field, Stone color) {
+<span class="fc" id="L49">		position[field] = color;</span>
+<span class="fc" id="L50">		var score = -score(position, color.opponent());</span>
+<span class="fc" id="L51">		position[field] = null;</span>
+<span class="fc" id="L52">		return score;</span>
+	}
+
+	/**
+	 * Score of {@code position} for {@code color}, who is about to move: positive if
+	 * {@code color} can force a win, negative if the opponent can, {@code 0} for a draw.
+	 */
+	private int score(Stone[] position, Stone color) {
+<span class="fc" id="L60">		var key = key(position, color);</span>
+<span class="fc" id="L61">		var known = scores.get(key);</span>
+<span class="fc bfc" id="L62" title="All 2 branches covered.">		if (known != null) {</span>
+<span class="fc" id="L63">			return known;</span>
+		}
+<span class="fc" id="L65">		var score = search(position, color);</span>
+<span class="fc" id="L66">		scores.put(key, score);</span>
+<span class="fc" id="L67">		return score;</span>
+	}
+
+	private int search(Stone[] position, Stone color) {
+<span class="fc bfc" id="L71" title="All 2 branches covered.">		if (TicTacToeMain.isWin(position, color.opponent())) {</span>
+<span class="fc" id="L72">			return -WIN; // the opponent has just completed a line</span>
+		}
+<span class="fc" id="L74">		var best = Integer.MIN_VALUE;</span>
+<span class="fc bfc" id="L75" title="All 2 branches covered.">		for (var i = 0; i &lt; position.length; i++) {</span>
+<span class="fc bfc" id="L76" title="All 2 branches covered.">			if (position[i] == null) {</span>
+<span class="fc" id="L77">				best = Math.max(best, scoreOfMove(position, i, color));</span>
+			}
+		}
+<span class="fc bfc" id="L80" title="All 2 branches covered.">		if (best == Integer.MIN_VALUE) {</span>
+<span class="fc" id="L81">			return DRAW; // the board is full and nobody has a line</span>
+		}
+		// one move further away: a win is worth a little less, a loss a little less bad
+<span class="fc" id="L84">		return best - Integer.signum(best);</span>
+	}
+
+	/** Encodes the position as a base-3 number and the colour to move in the lowest bit. */
+	private static int key(Stone[] position, Stone color) {
+<span class="fc" id="L89">		var code = 0;</span>
+<span class="fc bfc" id="L90" title="All 2 branches covered.">		for (var stone : position) {</span>
+<span class="fc bfc" id="L91" title="All 4 branches covered.">			code = code * 3 + (stone == null ? 0 : stone == Stone.CROSS ? 1 : 2);</span>
+		}
+<span class="fc bfc" id="L93" title="All 2 branches covered.">		return code * 2 + (color == Stone.CROSS ? 0 : 1);</span>
+	}
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.15.202606040825</span></div></body></html>

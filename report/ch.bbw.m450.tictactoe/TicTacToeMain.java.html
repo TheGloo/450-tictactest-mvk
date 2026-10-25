@@ -40,7 +40,7 @@ import ch.bbw.m450.tictactoe.players.HumanPlayer;
 <span class="fc bfc" id="L40" title="All 2 branches covered.">		for (var i = 0; i &lt; 3; i++) {</span>
 <span class="fc bfc" id="L41" title="All 2 branches covered.">			for (var j = 0; j &lt; 3; j++) {</span>
 <span class="fc" id="L42">				var index = i * 3 + j;</span>
-<span class="fc bfc" id="L43" title="All 2 branches covered.">				String color = board[index] == Stone.CROSS ? &quot;X&quot; : &quot;O&quot;;</span>
+<span class="fc bfc" id="L43" title="All 2 branches covered.">				var color = board[index] == Stone.CROSS ? &quot;X&quot; : &quot;O&quot;;</span>
 <span class="fc" id="L44">				color = &quot;\033[1m&quot; + color + &quot;\033[0m&quot;;</span>
 <span class="fc bfc" id="L45" title="All 2 branches covered.">				color = board[index] == null ? &quot;\033[37m&quot; + index + &quot;\033[0m&quot; : color;</span>
 <span class="fc" id="L46">				sb.append(color)</span>
