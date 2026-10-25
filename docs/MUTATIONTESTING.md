@@ -41,12 +41,11 @@ Mutanten überlebt haben).
 
 ### In der Pipeline
 
-Der Job **Mutation Testing (PIT)** in [`ci.yml`](../.github/workflows/ci.yml) läuft bei
-jedem Push und Pull Request parallel zum Build im DevContainer-Image. Er
+Der Schritt **Mutation testing (PIT)** im Build-Job von [`ci.yml`](../.github/workflows/ci.yml)
+läuft bei jedem Push und Pull Request im DevContainer-Image. Er
 
 - führt `./gradlew pitest` aus und **schlägt fehl, wenn der Score unter 90 % liegt**,
-- schreibt Score, Anzahl Mutanten, getötete, überlebende und nicht abgedeckte Mutanten in
-  die Zusammenfassung des Workflow-Laufs,
+- schreibt den Score in die Zusammenfassung des Workflow-Laufs,
 - lädt den HTML-Report als Artefakt **`mutation-report`** hoch.
 
 ---
@@ -111,43 +110,44 @@ Mit JUnit Pioneer wurden `HumanPlayer` und `main` testbar und sind seither nicht
 PIT ausgenommen; dazu kam der neue `PerfectPlayer`. Stand 25.10.2026:
 
 ```
->> Generated 137 mutations Killed 131 (96%)
+>> Generated 122 mutations Killed 122 (100%)
 ```
 
 | Klasse | Mutanten | getötet |
 |---|---:|---:|
 | `TicTacToeMain` | 85 | 85 |
-| `PerfectPlayer` | 41 | 35 |
+| `PerfectPlayer` | 26 | 26 |
 | `GreedyPlayer` | 6 | 6 |
 | `TicTacToePlayer.Stone` | 3 | 3 |
 | `HumanPlayer` | 2 | 2 |
-| **Total** | **137** | **131 (96 %)** |
+| **Total** | **122** | **122 (100 %)** |
 
-### Die sechs überlebenden Mutanten sind äquivalent
+### Wie PIT den `PerfectPlayer` vereinfacht hat
 
-Ein *äquivalenter Mutant* verändert den Code, aber nicht das beobachtbare Verhalten.
-Kein Test kann ihn töten, und er zeigt keine Lücke in den Tests:
+Die erste Fassung des `PerfectPlayer` hatte einen Cache für bewertete Stellungen (Base-3-
+Schlüssel plus Farbbit) und eine dreizeilige Tiefenbewertung. PIT liess darin **9
+Mutanten** überleben, alle *äquivalent*: eine andere, aber ebenfalls eindeutige
+Schlüsselkodierung, ein nie gelesener Cache, eine andere Reihenfolge bei gleich guten
+Zügen. Äquivalente Mutanten verändern den Code, aber nicht das Verhalten; kein Test kann
+sie töten.
 
-| Stelle in `PerfectPlayer` | Mutation | Warum äquivalent |
-|---|---|---|
-| `key`, `code * 3 + digit` | `+` → `-` | Die Kodierung mit negativen Ziffern ist genauso eindeutig, der Cache funktioniert unverändert. |
-| `key`, `code * 2 + colorBit` | `+` → `-` | ebenso: gerade und ungerade Schlüssel bleiben getrennt |
-| `key`, `color == CROSS` | → `true` bzw. `false` (2 Mutanten) | Das Farbbit fällt weg. Auf erreichbaren Brettern ist die Farbe am Zug durch die Steinzahl bestimmt; dieselbe Stellung kommt nie mit beiden Farben vor, der Cache kollidiert nicht. |
-| `play`, `score > bestScore` | → `>=` | Bei gleich guten Zügen wird der letzte statt der erste gewählt; beide sind perfekte Züge. |
-| `score`, `known != null` | → `false` | Der Cache wird nie gelesen. Nur langsamer, gleiches Ergebnis. |
+Statt sie zu dokumentieren, wurde der Code vereinfacht:
 
-Drei weitere Mutanten in der Tiefenbewertung (`if (best > 0) … if (best < 0) …`) waren
-anfangs ebenfalls übrig geblieben. Statt sie als äquivalent zu akzeptieren, wurde der
-Code zu `best - Integer.signum(best)` vereinfacht: weniger Verzweigungen, weniger
-Mutanten, und der verbleibende Mutant (`-` → `+`) wird von `prefersTheFasterWin`
-getötet. Mutation Testing hat hier also auch den Produktivcode verbessert.
+| Massnahme | Effekt |
+|---|---|
+| Cache entfernt (auf einem 3×3-Brett ist die volle Suche schnell genug) | 5 äquivalente Mutanten weniger, 40 Zeilen weniger |
+| Tiefenbewertung als `best - Integer.signum(best)` statt zwei `if` | 3 Mutanten weniger; der verbleibende (`-` → `+`) wird von `prefersTheFasterWin` getötet |
+| Test `choosesTheFirstOfEquallyGoodMoves` ergänzt | tötet den letzten Mutanten (`score > bestScore` → `>=`) und legt das deterministische Verhalten fest |
+
+Mutation Testing hat hier also nicht nur Testlücken gezeigt, sondern auch überflüssigen
+Produktivcode.
 
 ---
 
 ## 5. Schwellenwert
 
-Der Schwellenwert liegt bewusst bei **90 %** und nicht bei 100 %: Wie Kapitel 4 zeigt,
-entstehen bei neuem Code *äquivalente Mutanten*, also Änderungen, die das Verhalten gar
-nicht verändern und darum von keinem Test getötet werden können. Diese sollen den Build
-nicht blockieren. Ein deutlicher Rückgang, zum Beispiel neuer Code ohne aussagekräftige
+Der Schwellenwert liegt bewusst bei **90 %** und nicht bei 100 %: Bei neuem Code können
+*äquivalente Mutanten* entstehen (Kapitel 4 zeigt ein Beispiel), also Änderungen, die das
+Verhalten gar nicht verändern und darum von keinem Test getötet werden können. Diese
+sollen den Build nicht blockieren. Ein deutlicher Rückgang, zum Beispiel neuer Code ohne aussagekräftige
 Assertions, lässt die CI dagegen fehlschlagen.

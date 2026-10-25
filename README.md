@@ -31,9 +31,9 @@ Alle drei Reports lädt die CI bei jedem Commit als Artefakte hoch (`test-report
 | 3 | JaCoCo Report + Verification mit 90 % Branch-Coverage | `jacocoTestReport` (HTML/XML/CSV) nach jedem Testlauf; `jacocoTestCoverageVerification` mit `BRANCH COVEREDRATIO >= 0.90` hängt an `check`, der Build schlägt darunter fehl. Stand: **100 % Branch**, 96 % Line. Siehe [docs/COVERAGE.md](docs/COVERAGE.md) |
 | 4 | StdIn/StdOut-Tests mit JUnit Pioneer | `@StdIo` / `StdOut` in [`HumanPlayerTest`](src/test/java/ch/bbw/m450/tictactoe/players/HumanPlayerTest.java) (Eingabe über `System.in`, Prompt auf `System.out`) und in allen Spieltests, die die Konsolenausgabe des Spiels prüfen |
 | 5 | CI mit allen Reports als Artefakte, Build grün | [`ci.yml`](.github/workflows/ci.yml): Build + Tests + Coverage + Mutation Testing bei jedem Push; Artefakte `test-report`, `coverage-report`, `mutation-report`, `tictactoe-jar`. Dazu Coverage Gate für PRs, Coverage-Time-Series, Release- und DevContainer-Pipeline, siehe [docs/PIPELINES.md](docs/PIPELINES.md) |
-| 6 | Zusätzlicher, perfekt spielender Player | [`PerfectPlayer`](src/main/java/ch/bbw/m450/tictactoe/players/PerfectPlayer.java): Minimax (Negamax) über den vollständigen Spielbaum mit Memoisierung; bevorzugt den schnellsten Sieg. Nachweis in [`PerfectPlayerTest`](src/test/java/ch/bbw/m450/tictactoe/players/PerfectPlayerTest.java): verliert in **keiner** möglichen Partie (der Gegner probiert in jedem Zug jedes freie Feld), Remis gegen sich selbst, schlägt den `GreedyPlayer` als X und als O |
-| 7 | Zusätzliches Testframework mit Beispieltest | **jqwik** (Property-based Testing, eigene JUnit-Platform-Engine): [`PerfectPlayerProperties`](src/test/java/ch/bbw/m450/tictactoe/players/PerfectPlayerProperties.java), je 1000 zufällige Gegner bzw. Bretter pro Property |
-| 8 | Mutation Testing mit PIT | `./gradlew pitest`, Schwellenwert 90 %, eigener CI-Job. Stand: **96 %** (131 von 137 Mutanten getötet, die 6 übrigen sind äquivalent). Siehe [docs/MUTATIONTESTING.md](docs/MUTATIONTESTING.md) |
+| 6 | Zusätzlicher, perfekt spielender Player | [`PerfectPlayer`](src/main/java/ch/bbw/m450/tictactoe/players/PerfectPlayer.java): Minimax (Negamax) über den vollständigen Spielbaum, bevorzugt den schnellsten Sieg. Nachweis in [`PerfectPlayerTest`](src/test/java/ch/bbw/m450/tictactoe/players/PerfectPlayerTest.java): verliert in **keiner** möglichen Partie (der Gegner probiert in jedem Zug jedes freie Feld), Remis gegen sich selbst, schlägt den `GreedyPlayer` als X und als O |
+| 7 | Zusätzliches Testframework mit Beispieltest | **jqwik** (Property-based Testing, eigene JUnit-Platform-Engine): [`PerfectPlayerProperties`](src/test/java/ch/bbw/m450/tictactoe/players/PerfectPlayerProperties.java), eine Property gegen 1000 zufällige Gegner |
+| 8 | Mutation Testing mit PIT | `./gradlew pitest`, Schwellenwert 90 %, Schritt im CI-Build. Stand: **100 %** (122 von 122 Mutanten getötet). Siehe [docs/MUTATIONTESTING.md](docs/MUTATIONTESTING.md) |
 | 9 | Keine SonarLint-Warnings, `var`, aktuelle Versionen | JUnit `6.1.3`, AssertJ `3.27.7`, Pioneer `2.3.0`, jqwik `1.10.2`, JaCoCo `0.8.15`, PIT `1.30.0`, Gradle `9.8.2`, Zulu JDK 25. `var` für alle lokalen Variablen. Einzige Änderung am Originalcode: `String color` → `var color` in `TicTacToeMain.toString` |
 | 10 | Abgabe als privates GitHub-Projekt | Repository `TheGloo/450-tictactest-mvk` |
 
@@ -73,7 +73,7 @@ src/test/java/ch/bbw/m450/tictactoe/
 | [docs/TESTKONZEPT.md](docs/TESTKONZEPT.md) | Testziele, Strategie, Testfälle, Werkzeuge, Risiken |
 | [docs/TESTDOKUMENTATION.md](docs/TESTDOKUMENTATION.md) | jeder Testfall als GIVEN / WHEN / THEN, Testprotokolle |
 | [docs/COVERAGE.md](docs/COVERAGE.md) | JaCoCo-Report, Coverage Verification, Time-Series, Coverage Gate |
-| [docs/MUTATIONTESTING.md](docs/MUTATIONTESTING.md) | PIT: Einrichtung, gefundene Lücken, äquivalente Mutanten |
+| [docs/MUTATIONTESTING.md](docs/MUTATIONTESTING.md) | PIT: Einrichtung, gefundene Lücken, Ergebnis |
 | [docs/PIPELINES.md](docs/PIPELINES.md) | alle GitHub-Actions-Workflows |
 | [docs/DEVCONTAINER.md](docs/DEVCONTAINER.md) | DevContainer-Image, Versionierung, Continuous Deployment |
 

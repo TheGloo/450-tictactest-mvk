@@ -54,8 +54,8 @@ Ausführen der Tests:
 | `StoneTest` | `Stone.opponent()` (T13) | [StoneTest.java](https://github.com/TheGloo/450-tictactest-mvk/blob/main/src/test/java/ch/bbw/m450/tictactoe/StoneTest.java) |
 | `GreedyPlayerTest` | mitgelieferter Spieler (T11, T12) | [GreedyPlayerTest.java](https://github.com/TheGloo/450-tictactest-mvk/blob/main/src/test/java/ch/bbw/m450/tictactoe/players/GreedyPlayerTest.java) |
 | `HumanPlayerTest` | Konsolenspieler mit JUnit Pioneer (T14–T16) | [HumanPlayerTest.java](https://github.com/TheGloo/450-tictactest-mvk/blob/main/src/test/java/ch/bbw/m450/tictactoe/players/HumanPlayerTest.java) |
-| `PerfectPlayerTest` | perfekter Spieler (T18–T25) | [PerfectPlayerTest.java](https://github.com/TheGloo/450-tictactest-mvk/blob/main/src/test/java/ch/bbw/m450/tictactoe/players/PerfectPlayerTest.java) |
-| `PerfectPlayerProperties` | jqwik-Properties (P1, P2) | [PerfectPlayerProperties.java](https://github.com/TheGloo/450-tictactest-mvk/blob/main/src/test/java/ch/bbw/m450/tictactoe/players/PerfectPlayerProperties.java) |
+| `PerfectPlayerTest` | perfekter Spieler (T18–T26) | [PerfectPlayerTest.java](https://github.com/TheGloo/450-tictactest-mvk/blob/main/src/test/java/ch/bbw/m450/tictactoe/players/PerfectPlayerTest.java) |
+| `PerfectPlayerProperties` | jqwik-Property (P1) | [PerfectPlayerProperties.java](https://github.com/TheGloo/450-tictactest-mvk/blob/main/src/test/java/ch/bbw/m450/tictactoe/players/PerfectPlayerProperties.java) |
 
 Gesamter Test-Ordner: <https://github.com/TheGloo/450-tictactest-mvk/tree/main/src/test/java/ch/bbw/m450/tictactoe>
 
@@ -386,7 +386,7 @@ Quelle: [`HumanPlayerTest.java`](https://github.com/TheGloo/450-tictactest-mvk/b
 
 ## 4c. Der perfekte Spieler
 
-Quelle: [`PerfectPlayerTest.java`](https://github.com/TheGloo/450-tictactest-mvk/blob/main/src/test/java/ch/bbw/m450/tictactoe/players/PerfectPlayerTest.java). `PerfectPlayer` durchsucht den vollständigen Spielbaum (Minimax in Negamax-Form) und merkt sich jede bewertete Stellung.
+Quelle: [`PerfectPlayerTest.java`](https://github.com/TheGloo/450-tictactest-mvk/blob/main/src/test/java/ch/bbw/m450/tictactoe/players/PerfectPlayerTest.java). `PerfectPlayer` durchsucht bei jedem Zug den vollständigen Spielbaum (Minimax in Negamax-Form).
 
 ### T18 – `SingleMoves.takesTheImmediateWin(String pattern, Stone color, int expected)`
 
@@ -439,6 +439,18 @@ Parametrisierter Test mit 3 Durchläufen.
 | **THEN** | `IllegalStateException("cannot play at all")`. |
 
 **Warum dieser Test?** Gleiches Verhalten wie `GreedyPlayer` im selben Fall.
+
+### T26 – `SingleMoves.choosesTheFirstOfEquallyGoodMoves()`
+
+*"PerfectPlayer > single moves > takes the first of several equally good moves, so its play is deterministic"* — [PerfectPlayerTest.java](https://github.com/TheGloo/450-tictactest-mvk/blob/main/src/test/java/ch/bbw/m450/tictactoe/players/PerfectPlayerTest.java)
+
+| | |
+|---|---|
+| **GIVEN** | Ein leeres Brett. Gegen perfektes Gegenspiel führt jede der neun Eröffnungen zum Remis, alle Züge sind also gleich gut. |
+| **WHEN** | `player.play(board, CROSS)` aufgerufen wird. |
+| **THEN** | Rückgabe ist `0`, der erste der gleich guten Züge. |
+
+**Warum dieser Test?** Er legt fest, dass der Spieler bei gleich guten Zügen reproduzierbar den ersten nimmt; T24 und T25 bauen auf festen Zugfolgen auf. Ausserdem tötet er den letzten überlebenden PIT-Mutanten (`score > bestScore` → `>=`), der stattdessen den letzten gleich guten Zug wählen würde.
 
 ### T22 – `WholeGames.neverLosesAgainstAnyOpponent(Stone ownColor)`
 
@@ -495,7 +507,7 @@ Parametrisierter Test mit 2 Durchläufen (CROSS, CIRCLE).
 
 ## 4d. Property-based Tests mit jqwik
 
-Quelle: [`PerfectPlayerProperties.java`](https://github.com/TheGloo/450-tictactest-mvk/blob/main/src/test/java/ch/bbw/m450/tictactoe/players/PerfectPlayerProperties.java). jqwik ist eine eigene Engine auf der JUnit Platform: Statt fester Beispiele beschreibt eine `@Property` eine Eigenschaft, und jqwik generiert dafür standardmässig **1000 Eingaben**. Schlägt eine fehl, verkleinert jqwik sie automatisch zum einfachsten Gegenbeispiel (*Shrinking*). `@Provide`-Methoden liefern die Generatoren (`Arbitrary`).
+Quelle: [`PerfectPlayerProperties.java`](https://github.com/TheGloo/450-tictactest-mvk/blob/main/src/test/java/ch/bbw/m450/tictactoe/players/PerfectPlayerProperties.java). jqwik ist eine eigene Engine auf der JUnit Platform: Statt fester Beispiele beschreibt eine `@Property` eine Eigenschaft, und jqwik generiert dafür standardmässig **1000 Eingaben**. Schlägt eine fehl, verkleinert jqwik sie automatisch zum einfachsten Gegenbeispiel (*Shrinking*). Die `@Provide`-Methode liefert den Generator (`Arbitrary`).
 
 ### P1 – `neverLosesAgainstAnyOpponent(@ForAll List<Integer> preferences, @ForAll Stone ownColor)`
 
@@ -509,19 +521,6 @@ Quelle: [`PerfectPlayerProperties.java`](https://github.com/TheGloo/450-tictacte
 
 **Warum dieser Test?** Ergänzt T22 um eine zweite, unabhängige Formulierung: 1000 Gegner mit beliebiger Zugreihenfolge.
 
-### P2 – `playsToAFreeFieldWithoutChangingTheBoard(@ForAll Stone[] board, @ForAll Stone color)`
-
-*"PerfectPlayerProperties > playsToAFreeFieldWithoutChangingTheBoard"* — [PerfectPlayerProperties.java](https://github.com/TheGloo/450-tictactest-mvk/blob/main/src/test/java/ch/bbw/m450/tictactoe/players/PerfectPlayerProperties.java)
-
-| | |
-|---|---|
-| **GIVEN** | Ein zufälliges offenes Brett: jedes Feld `CROSS`, `CIRCLE` oder mit 40 % Wahrscheinlichkeit leer (`injectNull`), gefiltert auf mindestens ein freies Feld und keine bestehende Linie. |
-| **WHEN** | `player.play(board, color)` aufgerufen wird. |
-| **THEN** | Das gewählte Feld ist frei, und das übergebene Array ist danach unverändert. |
-
-**Warum dieser Test?** Die Suche setzt Steine probeweise und nimmt sie zurück; ein vergessenes Zurücknehmen würde das Brett des Aufrufers beschädigen. Zufällige, auch unerreichbare Bretter decken Fälle ab, die keine Partie erzeugt.
-
-
 ---
 
 ## 5. Testergebnis: Alle Tests erfolgreich
@@ -533,8 +532,8 @@ Befehl:
 ```
 
 **Ergebnis vom 25.10.2026: 76 ausgeführte Tests, 0 Fehler** (29 Testmethoden, davon 8
-parametrisiert und 2 jqwik-Properties à 1000 Durchläufe), Branch-Coverage **100 %**
-(Verification ≥ 90 % bestanden), Mutation Score **96 %**, `BUILD SUCCESSFUL`.
+parametrisiert und 1 jqwik-Property à 1000 Durchläufe), Branch-Coverage **100 %**
+(Verification ≥ 90 % bestanden), Mutation Score **100 %**, `BUILD SUCCESSFUL`.
 
 | Testklasse | Ausgeführte Tests |
 |---|---:|
@@ -543,8 +542,8 @@ parametrisiert und 2 jqwik-Properties à 1000 Durchläufe), Branch-Coverage **10
 | `TicTacToeMainTest` (`isWin` 41, `toString` 1, `play` 7, `main` 1) | 50 |
 | `GreedyPlayerTest` | 4 |
 | `HumanPlayerTest` | 3 |
-| `PerfectPlayerTest` (`single moves` 9, `whole games` 5) | 14 |
-| `PerfectPlayerProperties` | 2 |
+| `PerfectPlayerTest` (`single moves` 10, `whole games` 5) | 15 |
+| `PerfectPlayerProperties` | 1 |
 | **Total** | **76** |
 
 Auszug aus der Konsolenausgabe:
@@ -556,7 +555,7 @@ PerfectPlayer > whole games > ends in a draw against itself PASSED
 HumanPlayer > plays to the position typed on the console PASSED
 TicTacToeMain > main > lets a human play CROSS against the greedy player PASSED
 ...
->> Generated 137 mutations Killed 131 (96%)
+>> Generated 122 mutations Killed 122 (100%)
 
 BUILD SUCCESSFUL
 ```

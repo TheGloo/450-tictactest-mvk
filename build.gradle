@@ -84,9 +84,7 @@ pitest {
 	mutators = ['STRONGER']
 	outputFormats = ['HTML', 'XML']
 	timestampedReports = false
-	exportLineCoverage = true
 	threads = Runtime.runtime.availableProcessors()
-	// the build fails if fewer than 90 % of the mutants are killed
-	// (currently 96 %, the survivors are equivalent mutants, see docs/MUTATIONTESTING.md)
+	// the build fails if fewer than 90 % of the mutants are killed (currently 100 %)
 	mutationThreshold = 90
 }

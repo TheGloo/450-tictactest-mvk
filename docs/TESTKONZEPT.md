@@ -15,7 +15,7 @@
 | **Coverage / Mutation** | JaCoCo `0.8.15`, PIT `1.30.0` |
 | **Build-Tool** | Gradle Wrapper `9.8.2` (`./gradlew build`) |
 | **JDK** | Zulu 25 (gepinnt in `gradle/gradle-daemon-jvm.properties`) |
-| **Umfang** | 7 Testklassen, 29 Testmethoden, **76 ausgeführte Tests**, alle grün; Branch-Coverage **100 %**, Mutation Score **96 %** |
+| **Umfang** | 7 Testklassen, 29 Testmethoden, **76 ausgeführte Tests**, alle grün; Branch-Coverage **100 %**, Mutation Score **100 %** |
 
 ---
 
@@ -58,7 +58,7 @@ Getestet wird der Produktivcode unter `src/main/java/ch/bbw/m450/tictactoe`.
 | `TicTacToePlayer.Stone.opponent()` | Gegenfarbe | **ja** (T13) |
 | `GreedyPlayer.play(...)` | setzt auf das erste freie Feld | **ja** (T11, T12) |
 | `HumanPlayer.play(...)` | liest den Zug von `System.in`, Prompt auf `System.out` | **ja** (T14–T16, mit JUnit Pioneer) |
-| `PerfectPlayer.play(...)` | Minimax über den ganzen Spielbaum, verliert nie | **ja** (T18–T25, P1, P2) |
+| `PerfectPlayer.play(...)` | Minimax über den ganzen Spielbaum, verliert nie | **ja** (T18–T26, P1) |
 
 Das Spielfeld ist ein eindimensionales Array der Länge 9:
 
@@ -93,7 +93,7 @@ zu den konkreten Testfällen steht in Kapitel 6.
 | **Z8** | **Exakte Brettausgabe** – `toString` rendert Steine fett, leere Felder als graue Indizes, drei pro Zeile. | Der Mensch sieht nur diese Ausgabe; PIT zeigte, dass sie vorher ungeprüft war (`return ""` blieb unbemerkt). |
 | **Z9** | **Korrekte mitgelieferte Spieler** – `GreedyPlayer` nimmt das erste freie Feld und scheitert kontrolliert auf vollem Brett; `Stone.opponent()` liefert die Gegenfarbe. | Beide werden von Spielschleife und `PerfectPlayer` vorausgesetzt. |
 | **Z10** | **Konsolenspieler über stdin/stdout** – `HumanPlayer` liest die getippte Position, zeigt Brett und Prompt und scheitert bei Nicht-Zahlen; `main` verdrahtet ihn als X. | Einziger Berührungspunkt mit dem Benutzer; testbar erst durch JUnit Pioneer. |
-| **Z11** | **Perfekter Spieler** – `PerfectPlayer` verliert in keiner möglichen Partie, nutzt Gewinnchancen sofort, blockt Drohungen und verändert das übergebene Brett nicht. | Kernanforderung des Auftrags; ein Minimax mit einem Vorzeichenfehler verliert sofort, was nur ein erschöpfender Test zuverlässig zeigt. |
+| **Z11** | **Perfekter Spieler** – `PerfectPlayer` verliert in keiner möglichen Partie, nutzt Gewinnchancen sofort, blockt Drohungen und spielt deterministisch. | Kernanforderung des Auftrags; ein Minimax mit einem Vorzeichenfehler verliert sofort, was nur ein erschöpfender Test zuverlässig zeigt. |
 
 ---
 
@@ -106,7 +106,7 @@ zu den konkreten Testfällen steht in Kapitel 6.
 | **Unit-Test** | eine Methode isoliert | `isWin`, `toString`, `Stone.opponent`, einzelne Züge von `GreedyPlayer`, `HumanPlayer`, `PerfectPlayer` |
 | **Komponenten-/Integrationstest** | `play` im Zusammenspiel mit echten bzw. simulierten Spielern | vollständige Partien, Remis, Fehlerfälle, `main` |
 | **Erschöpfender Test** | alle Partien, die ein Spieler erreichen kann | T22: der Gegner probiert in jedem Zug jedes freie Feld |
-| **Property-based Test** (jqwik) | Eigenschaften, die für zufällige Eingaben gelten müssen | P1, P2 mit je 1000 generierten Gegnern bzw. Brettern |
+| **Property-based Test** (jqwik) | Eigenschaften, die für zufällige Eingaben gelten müssen | P1 mit 1000 generierten Gegnern |
 | **Smoke-/Setup-Test** | die Testinfrastruktur selbst | `DummySetupTest` (D1, D2) |
 | **Mutation Testing** (PIT) | ob die Tests Fehler im Code bemerken würden | `./gradlew pitest`, Schwellenwert 90 % |
 | **CI-Lauf** | die gesamte Suite in einer sauberen Umgebung | GitHub Actions bei jedem Push/PR |
@@ -124,7 +124,7 @@ Quellcodes abgeleitet und mit Mutation Testing gegen den Code verifiziert.
 | **Negativtest / Fehlerfall** | T2, T7 (kein Gewinner), T4 (Vorbedingung), T5 (regelwidriger Zug), T12/T21 (volles Brett), T16 (Nicht-Zahl). |
 | **Zustandsbasiertes Testen** | T3, T8, T9, T23–T25 durchlaufen ganze Partien mit Farbwechsel, vorzeitigem Ende und Remis. |
 | **Erschöpfendes Testen** | T22 spielt gegen jeden möglichen Gegnerzug; auf dem 3×3-Brett ist das in Millisekunden möglich. |
-| **Property-based Testing** | P1: „verliert gegen keinen zufälligen Gegner“, P2: „spielt immer auf ein freies Feld und verändert das Brett nicht“ – jqwik generiert die Eingaben und verkleinert Gegenbeispiele automatisch. |
+| **Property-based Testing** | P1: „verliert gegen keinen zufälligen Gegner“ – jqwik generiert 1000 Gegner und verkleinert ein Gegenbeispiel automatisch. |
 | **Parametrisiertes Testen** | `@MethodSource` (8 + 8 + 24 Bretter), `@CsvSource` (Spielerzüge), `@ValueSource`, `@EnumSource` – dieselbe Logik gegen viele Eingaben ohne Codeverdopplung. |
 | **Mutation Testing** | PIT hat 23 Lücken in der ersten Suite aufgedeckt (u. a. ungeprüftes `toString`, fehlendes Remis, fehlender CIRCLE-Sieg); für jede wurde ein Test ergänzt. |
 
@@ -192,6 +192,7 @@ PerfectPlayer
 │   ├── completes its own line as soon as it can                   (4 Durchläufe)
 │   ├── blocks the opponent's two in a line when it cannot win itself (3 Durchläufe)
 │   ├── wins at once instead of blocking first, ...
+│   ├── takes the first of several equally good moves, so its play is deterministic
 │   └── refuses to play on a full board
 └── whole games
     ├── never loses, whatever the opponent does                    (als CROSS, als CIRCLE)
@@ -212,7 +213,7 @@ das erwartete Verhalten in ganzen Sätzen.
 | `TestPlayers` | Test-Doubles (Lambdas, kein Mocking-Framework) | `greedy()` liefert einen frischen `GreedyPlayer`; `alwaysPlayingTo(int)` spielt stur dieselbe (auch ungültige) Position; `playingInOrder(int...)` spielt eine Partie nach Drehbuch |
 | `BoardAssert` | eigene AssertJ-Assertion | `assertThatBoard(...).isWonBy(CROSS)` / `.hasNoWinner()` / `.isNotWinFor(...)`; gibt bei einem Fehlschlag das betroffene Brett mit aus |
 | JUnit Pioneer `@StdIo` | Extension | ersetzt `System.in` durch die angegebenen Zeilen und reicht `System.out` als `StdOut` in den Test; stellt beide Streams danach wieder her |
-| jqwik `@Property` / `@Provide` | eigene Test-Engine | generiert Eingaben (`Arbitraries.shuffle`, `injectNull`, `filter`) und führt jede Property 1000-mal aus |
+| jqwik `@Property` / `@Provide` | eigene Test-Engine | generiert die Eingaben (`Arbitraries.shuffle`) und führt die Property 1000-mal aus |
 
 ### 5.4 Konventionen
 
@@ -254,12 +255,12 @@ Ausführliche GIVEN/WHEN/THEN-Beschreibungen: [TESTDOKUMENTATION.md](TESTDOKUMEN
 | **T19** | gegnerische Drohung blocken (3 Bretter) | `SingleMoves.blocksTheOpponentsThreat` (3) | parametrisiert | der Blockzug | Z11 |
 | **T20** | Sofortsieg vs. langsamer Zwangssieg | `SingleMoves.prefersTheFasterWin` | gezielter Einzelfall | Feld 7 (sofort) statt 3 | Z11 |
 | **T21** | volles Brett | `SingleMoves.failsOnAFullBoard` | Negativtest | `IllegalStateException("cannot play at all")` | Z11 |
+| **T26** | leeres Brett, alle Eröffnungen gleich gut | `SingleMoves.choosesTheFirstOfEquallyGoodMoves` | Determinismus | Feld 0 (der erste gleich gute Zug) | Z11 |
 | **T22** | alle Partien gegen jeden Gegnerzug, als X und als O | `WholeGames.neverLosesAgainstAnyOpponent` (2) | erschöpfend, `@EnumSource` | der Gegner hat auf keinem erreichten Brett drei in einer Linie | Z11 |
 | **T23** | perfekt gegen perfekt | `WholeGames.drawsAgainstItself` | zustandsbasiert | Remis | Z11 |
 | **T24** | perfekt (X) gegen greedy | `WholeGames.beatsTheGreedyPlayerAsCross` | zustandsbasiert | `CROSS` gewinnt | Z11 |
 | **T25** | greedy gegen perfekt (O) | `WholeGames.beatsTheGreedyPlayerAsCircle` | zustandsbasiert | `CIRCLE` gewinnt (2-4-6) | Z11 |
 | **P1** | 1000 zufällige Gegner (Zugpräferenz = Permutation der Felder), zufällige eigene Farbe | `PerfectPlayerProperties.neverLosesAgainstAnyOpponent` | property-based (jqwik) | Gewinner ist nie der Gegner | Z11 |
-| **P2** | 1000 zufällige offene Bretter | `PerfectPlayerProperties.playsToAFreeFieldWithoutChangingTheBoard` | property-based (jqwik) | Zug auf ein freies Feld, Brett danach unverändert | Z11 |
 | **D1** | JUnit-Assertion wird gefunden und ausgeführt | `DummySetupTest.junitDummy` | Smoke-Test | grün | Z6 |
 | **D2** | AssertJ liegt auf dem Test-Classpath | `DummySetupTest.assertJDummy` | Smoke-Test | grün | Z6 |
 
@@ -276,7 +277,7 @@ Ausführliche GIVEN/WHEN/THEN-Beschreibungen: [TESTDOKUMENTATION.md](TESTDOKUMEN
 | Z8 | T10 | 1 |
 | Z9 | T11, T12, T13 | 5 |
 | Z10 | T14, T15, T16, T17 | 4 |
-| Z11 | T18–T25, P1, P2 | 16 (+ 2 × 1000 jqwik-Durchläufe) |
+| Z11 | T18–T26, P1 | 16 (+ 1000 jqwik-Durchläufe) |
 | Z7 | alle Testfälle, Coverage-Verification und PIT, ausgeführt durch `.github/workflows/ci.yml` | 76 pro CI-Lauf |
 | | **Summe** | **76** |
 
@@ -297,7 +298,7 @@ Testfall zahlt auf genau ein Ziel ein.
 | Testberichte | `build/reports/tests/test/index.html`; Konsolenausgabe über `testLogging { events 'passed', 'skipped', 'failed' }` |
 | Isolation | keine externen Systeme, keine Datenbank, kein Netzwerk; `System.in`/`System.out` werden über Pioneer ersetzt und wiederhergestellt; keine Mocking-Frameworks |
 | Coverage | JaCoCo `0.8.15`; Report unter `build/reports/jacoco/test/` (HTML, XML, CSV); `jacocoTestCoverageVerification` erzwingt **≥ 90 % Branch-Coverage** (Ist: 100 %), siehe [COVERAGE.md](COVERAGE.md) |
-| Mutation Testing | PIT `1.30.0` mit `STRONGER`-Mutatoren; Schwellenwert 90 % (Ist: 96 %), siehe [MUTATIONTESTING.md](MUTATIONTESTING.md) |
+| Mutation Testing | PIT `1.30.0` mit `STRONGER`-Mutatoren; Schwellenwert 90 % (Ist: 100 %), siehe [MUTATIONTESTING.md](MUTATIONTESTING.md) |
 | CI | GitHub Actions (`.github/workflows/ci.yml`) bei jedem Push und bei PRs auf `main`; Jobs laufen im DevContainer-Image `ghcr.io/thegloo/450-tictactest-mvk` und laden Test-, Coverage- und Mutation-Report als Artefakte hoch. Das Coverage Gate (`coverage-gate.yml`) verhindert, dass ein PR die Coverage von `main` senkt |
 | Reproduzierbarkeit | feste Abhängigkeitsversionen, gepinnte JDK-Version, Gradle Wrapper im Repository, identisches Container-Image lokal und in der CI |
 
@@ -312,7 +313,7 @@ Ausgeführter Befehl:
 ```
 
 **Ergebnis vom 25.10.2026: 76 ausgeführte Tests, 0 Fehler, Branch-Coverage 100 %
-(104/104), Line-Coverage 96 % (80/83), 131 von 137 Mutanten getötet (96 %),
+(94/94), Line-Coverage 96 % (68/71), 122 von 122 Mutanten getötet (100 %),
 `BUILD SUCCESSFUL`.**
 
 | Testklasse | Testmethoden | Ausgeführte Tests |
@@ -322,8 +323,8 @@ Ausgeführter Befehl:
 | `TicTacToeMainTest` | 11 (davon 4 parametrisiert) | 50 |
 | `GreedyPlayerTest` | 2 (davon 1 parametrisiert) | 4 |
 | `HumanPlayerTest` | 3 | 3 |
-| `PerfectPlayerTest` | 8 (davon 3 parametrisiert) | 14 |
-| `PerfectPlayerProperties` | 2 Properties à 1000 Durchläufe | 2 |
+| `PerfectPlayerTest` | 9 (davon 3 parametrisiert) | 15 |
+| `PerfectPlayerProperties` | 1 Property à 1000 Durchläufe | 1 |
 | **Total** | **29** | **76** |
 
 Die Testprotokolle und Screenshots stehen in
@@ -363,7 +364,7 @@ Die Testprotokolle und Screenshots stehen in
 | **R6** | Ein Test verändert mit `System.in`/`System.out` globalen Zustand | Folgetests würden in einen fremden Stream schreiben | Pioneer stellt beide Streams nach jedem Test wieder her, die jqwik-Klasse in `@AfterProperty` |
 | **R7** | Unterschiedliche JDK-/Gradle-Versionen auf Entwickler- und CI-Maschine | Tests verhalten sich lokal anders als in der CI | JDK gepinnt, Wrapper im Repository, lokal und in der CI dasselbe Container-Image |
 | **R8** | `PerfectPlayer` wertet mit Vorzeichen (Negamax): ein Vorzeichenfehler lässt ihn aktiv auf die Niederlage spielen | der „perfekte“ Spieler verliert | T22 spielt erschöpfend gegen jeden Gegnerzug, P1 zusätzlich gegen 1000 Zufallsgegner (Z11) |
-| **R9** | Äquivalente Mutanten im `PerfectPlayer` (andere, aber ebenfalls eindeutige Schlüsselkodierung; Tie-Break-Reihenfolge; Cache-Umgehung) | Mutation Score unter 100 %, obwohl kein Verhalten ungeprüft ist | analysiert und in [MUTATIONTESTING.md](MUTATIONTESTING.md) dokumentiert; Schwellenwert deshalb 90 % |
+| **R9** | `PerfectPlayer` durchsucht ohne Cache bei jedem Zug den ganzen Spielbaum (leeres Brett: rund 550 000 Stellungen) | die jqwik-Property mit 1000 Partien braucht etwa 6 s | bewusst in Kauf genommen: kein Cache bedeutet weniger Code und keine äquivalenten Mutanten; PIT führt die Property nicht aus |
 
 ---
 

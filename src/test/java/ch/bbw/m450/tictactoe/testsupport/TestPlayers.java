@@ -1,5 +1,7 @@
 package ch.bbw.m450.tictactoe.testsupport;
 
+import java.util.stream.IntStream;
+
 import ch.bbw.m450.tictactoe.TicTacToePlayer;
 import ch.bbw.m450.tictactoe.players.GreedyPlayer;
 
@@ -34,7 +36,7 @@ public final class TestPlayers {
 	 * game. Once the script is used up it plays to {@code -1}, which the game rejects.
 	 */
 	public static TicTacToePlayer playingInOrder(int... positions) {
-		var next = new int[1];
-		return (board, colorToPlay) -> next[0] < positions.length ? positions[next[0]++] : -1;
+		var script = IntStream.of(positions).iterator();
+		return (board, colorToPlay) -> script.hasNext() ? script.nextInt() : -1;
 	}
 }

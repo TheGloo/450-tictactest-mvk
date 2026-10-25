@@ -61,6 +61,13 @@ class PerfectPlayerTest {
 		}
 
 		@Test
+		@DisplayName("takes the first of several equally good moves, so its play is deterministic")
+		void choosesTheFirstOfEquallyGoodMoves() {
+			// on an empty board every opening leads to a draw against perfect play
+			assertThat(player.play(board(EMPTY), Stone.CROSS)).isZero();
+		}
+
+		@Test
 		@DisplayName("refuses to play on a full board")
 		void failsOnAFullBoard() {
 			assertThatThrownBy(() -> player.play(board(DRAW), Stone.CROSS)).isInstanceOf(IllegalStateException.class)
@@ -78,9 +85,7 @@ class PerfectPlayerTest {
 		void neverLosesAgainstAnyOpponent(Stone ownColor) {
 			// the opponent tries every free field at every turn, so this plays out
 			// every game the perfect player can get into
-			var games = playOutEveryGame(board(EMPTY), Stone.CROSS, ownColor);
-
-			assertThat(games).as("number of games played").isPositive();
+			playOutEveryGame(board(EMPTY), Stone.CROSS, ownColor);
 		}
 
 		@Test
@@ -112,32 +117,27 @@ class PerfectPlayerTest {
 		 * Plays {@code board} to the end along every branch: the perfect player makes its
 		 * move, the opponent branches over all free fields. Fails as soon as the opponent
 		 * has three in a line on any board reached.
-		 *
-		 * @return the number of finished games
 		 */
-		private int playOutEveryGame(Stone[] board, Stone toMove, Stone ownColor) {
+		private void playOutEveryGame(Stone[] board, Stone toMove, Stone ownColor) {
 			assertThatBoard(board).isNotWinFor(ownColor.opponent());
 			if (TicTacToeMain.isWin(board, ownColor) || isFull(board)) {
-				return 1;
+				return;
 			}
 			if (toMove == ownColor) {
-				var move = player.play(board, ownColor);
-				return playOutWith(board, move, toMove, ownColor);
+				playOutWith(board, player.play(board, ownColor), toMove, ownColor);
+				return;
 			}
-			var games = 0;
 			for (var field = 0; field < board.length; field++) {
 				if (board[field] == null) {
-					games += playOutWith(board, field, toMove, ownColor);
+					playOutWith(board, field, toMove, ownColor);
 				}
 			}
-			return games;
 		}
 
-		private int playOutWith(Stone[] board, int move, Stone toMove, Stone ownColor) {
+		private void playOutWith(Stone[] board, int move, Stone toMove, Stone ownColor) {
 			board[move] = toMove;
-			var games = playOutEveryGame(board, toMove.opponent(), ownColor);
+			playOutEveryGame(board, toMove.opponent(), ownColor);
 			board[move] = null;
-			return games;
 		}
 
 		private boolean isFull(Stone[] board) {

@@ -57,8 +57,7 @@ auf `main` die Coverage Time-Series.
 | Job | Läuft in | Aufgabe |
 |---|---|---|
 | `image` – *DevContainer image* | `ubuntu-latest` | liest die Image-Version aus `devcontainer.json` |
-| `build` – *Build, Test & Coverage* | DevContainer-Image (`--user root`) | `./gradlew build` (Tests + JaCoCo-Report + Coverage Verification: **Branch ≥ 90 %**, sonst rot), Coverage-Tabelle in der Zusammenfassung, Artefakte hochladen; Output `coverage` (Line Coverage) |
-| `mutation` – *Mutation Testing (PIT)* | DevContainer-Image (`--user root`), parallel zu `build` | `./gradlew pitest`, schlägt unter 90 % Mutation Score fehl; Score-Tabelle in der Zusammenfassung, Artefakt `mutation-report` (siehe [MUTATIONTESTING.md](MUTATIONTESTING.md)) |
+| `build` – *Build, Test, Coverage & Mutation* | DevContainer-Image (`--user root`) | `./gradlew build` (Tests + JaCoCo-Report + Coverage Verification: **Branch ≥ 90 %**, sonst rot), danach `./gradlew pitest` (Mutation Score ≥ 90 %, sonst rot); Coverage-Tabelle und Mutation Score in der Zusammenfassung, Artefakte hochladen; Output `coverage` (Line Coverage) |
 | `coverage-pages` – *Coverage time series* | `ubuntu-latest`, **nur bei Push auf `main`** | Artefakt `coverage-report` laden, eigene Action `coverage-timeseries` aufrufen → Zeile an `coverage-history.csv` auf `gh-pages` anhängen, Report + Seite aktualisieren, pushen |
 
 **Artefakte**
