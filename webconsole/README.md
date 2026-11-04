@@ -18,14 +18,24 @@ geholt (oder als Datei hineinkopiert).
 - Ein GitHub-Release mit angehängtem Jar, erzeugt vom
   [Release-Workflow](../docs/PIPELINES.md#3-release) (Tag `v1.2.3` → Asset
   `tictactoe-1.2.3.jar`). Alternativ ein lokales Jar, siehe unten.
+- Für das private Repo: [GitHub CLI](https://cli.github.com/) mit Zugriff aufs Repo
+  (`gh auth status`), um das Jar herunterzuladen.
 
 ## Start
 
-Im Repo-Root:
+Im Repo-Root. `TheGloo/450-tictactest-mvk` ist ein **privates** Repository, der
+Download ohne Token schlägt dort fehl. Deshalb ist der Standardweg: Release-Jar mit
+der GitHub CLI (eigenes Login, kein Token im Image) nach `webconsole/jar/` holen und
+dann bauen:
 
 ```bash
+gh release download v1.0.0 --repo TheGloo/450-tictactest-mvk --pattern '*.jar' --dir webconsole/jar
 docker compose up --build        # Image bauen und starten (Ctrl+C beendet)
 ```
+
+Bei einem **öffentlichen** Repository (z. B. Fork) entfällt der erste Schritt, dann
+lädt der Build das Asset selbst herunter. Fehlt das Jar und scheitert der Download,
+bricht der Build mit einem Hinweis auf diesen Ablauf ab.
 
 Dann im Browser **http://localhost:8080** öffnen und spielen: Feldnummer (0–8)
 eingeben, Enter. Der Port ist nur an `127.0.0.1` gebunden, also nur auf dem eigenen
@@ -42,7 +52,19 @@ Stoppen und aufräumen: `docker compose down`.
 
 ## Version wechseln
 
-Standard ist das Release-Tag `v1.0.0`. Eine andere Version wird beim Build gewählt:
+Standard ist das Release-Tag `v1.0.0`.
+
+**Privates Repo (Standard):** Jar in `webconsole/jar/` austauschen. Dort darf genau
+ein Jar liegen, sonst bricht der Build ab. `TICTACTEST_VERSION` setzt dann nur noch
+das Image-Tag.
+
+```bash
+rm -f webconsole/jar/*.jar
+gh release download v1.2.3 --repo TheGloo/450-tictactest-mvk --pattern '*.jar' --dir webconsole/jar
+TICTACTEST_VERSION=v1.2.3 docker compose up --build
+```
+
+**Öffentliches Repo (Download im Build):** Die Version wird per Build-Arg gewählt:
 
 ```bash
 TICTACTEST_VERSION=v1.2.3 docker compose up --build
@@ -63,15 +85,10 @@ geholt. `latest` funktioniert nicht, weil der Dateiname die Version enthält.
 Der Download ohne Token klappt nur bei einem **öffentlichen** Repository. Tokens kommen
 nicht ins Image und nicht ins Repo. Stattdessen:
 
-**Lokale Datei:** Jar nach `webconsole/jar/` legen, dann wird genau diese Datei
-verwendet (die Build-Args für Repo/Version werden ignoriert):
-
-```bash
-gh release download v1.2.3 --pattern '*.jar' --dir webconsole/jar
-docker compose up --build
-```
-
-Danach `webconsole/jar/*.jar` wieder löschen, sonst bleibt es bei dieser Datei.
+**Lokale Datei:** Liegt genau ein Jar in `webconsole/jar/`, wird diese Datei
+verwendet (siehe [Start](#start)). Die Build-Args für Repo, Version und `JAR_URL`
+werden dann ignoriert. Für den Download im Build `webconsole/jar/*.jar` wieder
+löschen. Die Datei wird nicht committet (`.gitignore`).
 
 **Eigene URL:** `JAR_URL` überschreibt die Release-URL:
 

@@ -32,14 +32,25 @@ RUN apt-get update \
 COPY jar/ /tmp/jar/
 RUN set -eu; \
 	mkdir -p /app; \
-	local_jar="$(find /tmp/jar -maxdepth 1 -name '*.jar' | head -n 1)"; \
-	if [ -n "$local_jar" ]; then \
+	jar_count="$(find /tmp/jar -maxdepth 1 -name '*.jar' | wc -l)"; \
+	if [ "$jar_count" -gt 1 ]; then \
+		echo "ERROR: more than one jar in webconsole/jar/, keep exactly one:" >&2; \
+		ls -1 /tmp/jar/*.jar >&2; \
+		exit 1; \
+	elif [ "$jar_count" -eq 1 ]; then \
+		local_jar="$(find /tmp/jar -maxdepth 1 -name '*.jar')"; \
 		echo "Using local jar: $local_jar"; \
 		cp "$local_jar" /app/tictactest.jar; \
 	else \
 		url="${JAR_URL:-https://github.com/${TICTACTEST_REPO}/releases/download/${TICTACTEST_VERSION}/tictactoe-${TICTACTEST_VERSION#v}.jar}"; \
 		echo "Downloading $url"; \
-		curl -fsSL -o /app/tictactest.jar "$url"; \
+		if ! curl -fsSL -o /app/tictactest.jar "$url"; then \
+			echo "ERROR: download failed: $url" >&2; \
+			echo "Private repository or missing release? Put the release jar into webconsole/jar/, e.g.:" >&2; \
+			echo "  gh release download ${TICTACTEST_VERSION} --repo ${TICTACTEST_REPO} --pattern '*.jar' --dir webconsole/jar" >&2; \
+			echo "See webconsole/README.md." >&2; \
+			exit 1; \
+		fi; \
 	fi; \
 	rm -rf /tmp/jar; \
 	if [ -n "$JAR_SHA256" ]; then \

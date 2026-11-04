@@ -1,5 +1,7 @@
 # Web-Konsole für TicTacTest: http://localhost:8080
 # Start: docker compose up --build    Doku: webconsole/README.md
+# Privates Repo: Release-Jar vorher nach webconsole/jar/ legen (gh release download),
+# sonst scheitert der Download im Build.
 services:
   webconsole:
     build:
