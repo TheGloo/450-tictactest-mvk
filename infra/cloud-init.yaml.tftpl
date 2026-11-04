@@ -1,0 +1,110 @@
+#cloud-config
+# Runs once when the instance is created (infra/main.tf). It installs the runtime and
+# the service, the application itself comes from the deployment: tictactest-deploy.
+
+write_files:
+  # the web console as a service: starts at boot, restarts after a crash, not as root,
+  # starts only the jar (never a shell), listens only on localhost behind nginx
+  - path: /etc/systemd/system/tictactest.service
+    content: |
+      [Unit]
+      Description=TicTacTest web console (ttyd)
+      After=network-online.target
+      # nothing deployed yet: tictactest-deploy starts the service later
+      ConditionPathExists=/opt/tictactest/current/tictactoe.jar
+
+      [Service]
+      User=tictactest
+      ExecStart=/usr/local/bin/ttyd --interface lo --port 7681 --writable --max-clients ${max_players} --client-option titleFixed=TicTacTest java -XX:+UseSerialGC -Xmx32m -jar /opt/tictactest/current/tictactoe.jar
+      Restart=always
+      RestartSec=2
+      NoNewPrivileges=true
+      ProtectSystem=strict
+      ProtectHome=true
+      PrivateTmp=true
+
+      [Install]
+      WantedBy=multi-user.target
+
+  # nginx in front of ttyd: the terminal on /, the running version on /version
+  - path: /etc/nginx/nginx.conf
+    content: |
+      user nginx;
+      worker_processes auto;
+      error_log /var/log/nginx/error.log notice;
+      pid /run/nginx.pid;
+      events { worker_connections 1024; }
+      http {
+        server_tokens off;
+        access_log /var/log/nginx/access.log;
+        server {
+          listen 80 default_server;
+          # read by the frontend on the S3 origin
+          location = /version {
+            alias /opt/tictactest/current/version.txt;
+            default_type text/plain;
+            add_header Access-Control-Allow-Origin "*" always;
+            add_header Cache-Control "no-store" always;
+          }
+          location / {
+            proxy_pass http://127.0.0.1:7681;
+            proxy_http_version 1.1;
+            proxy_set_header Upgrade $http_upgrade;
+            proxy_set_header Connection "upgrade";
+            proxy_set_header Host $host;
+            proxy_read_timeout 1h;
+          }
+        }
+      }
+
+  # Deploys one version: jar from the private artifact bucket (instance profile, no keys),
+  # smoke test, switch, restart. A jar that does not start is never switched to.
+  # Called by deploy/backend.sh over SSM: tictactest-deploy 1.2.0
+  - path: /usr/local/bin/tictactest-deploy
+    permissions: "0755"
+    content: |
+      #!/bin/bash
+      set -euo pipefail
+      export AWS_DEFAULT_REGION=${region}
+      version=$1
+      bucket=${artifact_bucket}
+      dir=/opt/tictactest/releases/$version
+      tmp=$(mktemp -d)
+      trap 'rm -rf "$tmp"' EXIT
+
+      aws s3 cp --only-show-errors "s3://$bucket/releases/$version/tictactoe.jar" "$tmp/tictactoe.jar"
+      chmod 644 "$tmp/tictactoe.jar"
+
+      # the game must start and ask for the first move (stdin is empty, then it ends)
+      out=$(timeout 30 runuser -u tictactest -- java -XX:+UseSerialGC -Xmx32m -jar "$tmp/tictactoe.jar" < /dev/null 2>&1 || true)
+      if ! grep -q "(0-8)" <<< "$out"; then
+        echo "release $version: jar does not start, keeping the running version" >&2
+        echo "$out" >&2
+        exit 1
+      fi
+
+      install -d -m 755 "$dir"
+      install -m 644 "$tmp/tictactoe.jar" "$dir/tictactoe.jar"
+      echo "$version" > "$dir/version.txt"
+      # atomic switch; after a reboot the same version runs (the link is on disk)
+      ln -sfn "$dir" /opt/tictactest/current.new
+      mv -T /opt/tictactest/current.new /opt/tictactest/current
+      # a replaced instance restores this version on its first boot
+      echo "$version" | aws s3 cp --only-show-errors - "s3://$bucket/state/backend-version"
+      systemctl restart tictactest
+      echo "deployed $version"
+
+runcmd:
+  # fixed versions; the Amazon Linux 2023 repository is versioned with the AMI
+  - dnf install -y java-25-amazon-corretto-headless-25.0.5.0.10 nginx-1.30.6
+  # ttyd is not in the repository: static binary with fixed version and checksum
+  - curl -fsSL -o /usr/local/bin/ttyd https://github.com/tsl0922/ttyd/releases/download/${ttyd_version}/ttyd.x86_64
+  - echo "${ttyd_sha256}  /usr/local/bin/ttyd" | sha256sum --check --strict
+  - chmod 755 /usr/local/bin/ttyd
+  - useradd --system --no-create-home --shell /sbin/nologin tictactest
+  - install -d -m 755 /opt/tictactest /opt/tictactest/releases
+  - systemctl daemon-reload
+  - systemctl enable --now nginx
+  - systemctl enable tictactest
+  # new instance (first apply or replaced): install the version that was deployed last
+  - v=$(aws s3 cp --region ${region} s3://${artifact_bucket}/state/backend-version - 2>/dev/null) && /usr/local/bin/tictactest-deploy "$v" || echo "no version deployed yet"

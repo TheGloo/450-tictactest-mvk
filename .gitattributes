@@ -3,3 +3,6 @@ gradlew text eol=lf
 *.jar binary
 *.sh text eol=lf
 Dockerfile text eol=lf
+*.tf text eol=lf
+*.tftpl text eol=lf
+nginx.conf text eol=lf

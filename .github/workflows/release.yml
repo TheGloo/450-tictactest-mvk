@@ -38,6 +38,17 @@ jobs:
       - name: Build runnable jar
         run: ./gradlew build -Pversion="$VERSION" --stacktrace
 
+      # Frontend archive: the files of frontend/ plus the version from the tag. config.js
+      # stays out, every environment has its own (on S3 written by OpenTofu).
+      - name: Build frontend archive
+        run: |
+          mkdir -p build/frontend
+          cp frontend/* build/frontend/
+          rm build/frontend/config.js
+          printf '{ "version": "%s" }\n' "$VERSION" > build/frontend/version.json
+          # `jar` writes a plain zip and is part of the JDK in the image
+          jar --create --no-manifest --file "build/tictactest-frontend-$VERSION.zip" -C build/frontend .
+
       - name: Create GitHub Release
         env:
           GH_TOKEN: ${{ github.token }}
@@ -46,62 +57,53 @@ jobs:
           git config --global --add safe.directory "$GITHUB_WORKSPACE"
           gh release create "$GITHUB_REF_NAME" \
             build/libs/*.jar \
+            "build/tictactest-frontend-$VERSION.zip" \
             --title "$GITHUB_REF_NAME" \
             --generate-notes
 
-  # Deploys the release to EC2, each part only if it differs from what runs there:
-  # infrastructure (tofu plan), jar and web console (hash on the server, deploy.sh).
-  deploy:
-    name: Deploy changed parts to EC2
-    needs: release
+  # What changed since the previous release tag? Not the last commit: a release can
+  # contain many commits, and a commit on main without a tag is never deployed.
+  changes:
+    name: Changes since previous release
     runs-on: ubuntu-latest
-    permissions:
-      contents: read
-    # one deployment at a time, a second release waits instead of cancelling
-    concurrency:
-      group: deploy
-      cancel-in-progress: false
-    env:
-      AWS_ACCESS_KEY_ID: ${{ secrets.AWS_ACCESS_KEY_ID }}
-      AWS_SECRET_ACCESS_KEY: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
-      AWS_SESSION_TOKEN: ${{ secrets.AWS_SESSION_TOKEN }}
-      AWS_REGION: us-east-1
-
+    outputs:
+      backend: ${{ steps.diff.outputs.backend }}
+      frontend: ${{ steps.diff.outputs.frontend }}
     steps:
       - uses: actions/checkout@v4
-
-      - uses: opentofu/setup-opentofu@v1
         with:
-          tofu_version: 1.13.1
-          tofu_wrapper: false
+          fetch-depth: 0 # all commits and tags, otherwise there is nothing to compare
 
-      # exactly the jar that is attached to the release, not a new build
-      - name: Download release jar
-        env:
-          GH_TOKEN: ${{ github.token }}
-        run: gh release download "$GITHUB_REF_NAME" --pattern '*.jar' --dir dist
-
-      - name: Infrastructure
-        working-directory: infra
+      - name: Compare with previous release tag
+        id: diff
         run: |
-          printf '| Teil | Ergebnis |\n|---|---|\n' >> "$GITHUB_STEP_SUMMARY"
-          tofu init -input=false
-          # exit code 0: nothing to do, 2: changes, anything else: error
-          code=0
-          tofu plan -input=false -detailed-exitcode -out=tfplan || code=$?
-          case $code in
-            0) echo "| infra | unverändert, übersprungen |" >> "$GITHUB_STEP_SUMMARY" ;;
-            2) tofu apply -input=false tfplan
-               echo "| infra | geändert, \`tofu apply\` |" >> "$GITHUB_STEP_SUMMARY" ;;
-            *) exit "$code" ;;
-          esac
-          echo "HOST=$(tofu output -raw public_ip)" >> "$GITHUB_ENV"
+          previous=$(git describe --tags --abbrev=0 --match 'v[0-9]*' "$GITHUB_REF_NAME^" 2>/dev/null || true)
+          if [[ -z "$previous" ]]; then
+            echo "first release: deploy everything"
+            backend=true frontend=true
+          else
+            files=$(git diff --name-only "$previous" "$GITHUB_REF_NAME")
+            echo "changed since $previous:"; echo "$files"
+            # backend = everything that ends up in the jar
+            backend=$(grep -qE '^(src/main/|gradle/|build\.gradle$|settings\.gradle$|gradle\.properties$)' <<< "$files" && echo true || echo false)
+            # frontend = frontend/ without the local config.js
+            frontend=$(grep '^frontend/' <<< "$files" | grep -qv '^frontend/config\.js$' && echo true || echo false)
+          fi
+          echo "backend=$backend" >> "$GITHUB_OUTPUT"
+          echo "frontend=$frontend" >> "$GITHUB_OUTPUT"
+          {
+            echo "| Vergleich | Backend | Frontend |"
+            echo "|---|---|---|"
+            echo "| ${previous:-erster Release} → $GITHUB_REF_NAME | $backend | $frontend |"
+          } >> "$GITHUB_STEP_SUMMARY"
 
-      - name: Jar and web console
-        env:
-          SSH_PRIVATE_KEY: ${{ secrets.SSH_PRIVATE_KEY }}
-        run: |
-          install -m 600 /dev/null "$RUNNER_TEMP/deploy_key"
-          echo "$SSH_PRIVATE_KEY" > "$RUNNER_TEMP/deploy_key"
-          SSH_KEY="$RUNNER_TEMP/deploy_key" .github/scripts/deploy.sh "$HOST" dist/*.jar
-          echo "**TicTacTest:** http://$HOST/" >> "$GITHUB_STEP_SUMMARY"
+  deploy:
+    name: Deploy
+    needs: [release, changes]
+    if: needs.changes.outputs.backend == 'true' || needs.changes.outputs.frontend == 'true'
+    uses: ./.github/workflows/deploy.yml
+    with:
+      tag: ${{ github.ref_name }}
+      backend: ${{ needs.changes.outputs.backend == 'true' }}
+      frontend: ${{ needs.changes.outputs.frontend == 'true' }}
+    secrets: inherit

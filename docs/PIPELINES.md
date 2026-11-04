@@ -12,7 +12,8 @@ Stand **25.10.2026**. Beschrieben ist der IST-Zustand der Dateien unter
 |---|---|---|---|---|
 | 1 | **CI** | [`ci.yml`](../.github/workflows/ci.yml) | Push auf jeden Branch, PR auf `main`, manuell | Build + Tests + Coverage + Mutation Testing; Artefakte `coverage-report`, `test-report`, `tictactoe-jar`, `mutation-report`; auf `main` zusätzlich die Coverage Time-Series auf GitHub Pages |
 | 2 | **Coverage Gate** | [`coverage-gate.yml`](../.github/workflows/coverage-gate.yml) | PR auf `main` geöffnet/aktualisiert, manuell | PASS/FAIL: Coverage des Branches ≥ Coverage von `main` |
-| 3 | **Release** | [`release.yml`](../.github/workflows/release.yml) | Push eines Tags `v*` | GitHub Release mit angehängtem JAR, danach Deployment der geänderten Teile auf EC2 |
+| 3 | **Release** | [`release.yml`](../.github/workflows/release.yml) | Push eines Tags `v*` | GitHub Release mit JAR und Frontend-Archiv, danach Deployment der seit dem vorherigen Release geänderten Teile |
+| 3b | **Deploy** | [`deploy.yml`](../.github/workflows/deploy.yml) | von `release.yml` aufgerufen, manuell mit beliebigem Tag | Backend über S3 + SSM auf EC2, Frontend nach S3, jeweils mit Versionsprüfung |
 | 4 | **DevContainer** | [`devcontainer.yml`](../.github/workflows/devcontainer.yml) | Änderung am Image (PR, `main`), Tag `devcontainer-v*` | getestetes Image; bei einem Tag: veröffentlichte Version in GHCR + Pull Request, der sie einsetzt |
 | – | *DevContainer image reference* | [`devcontainer-ref.yml`](../.github/workflows/devcontainer-ref.yml) | nur `workflow_call` | liefert den übrigen Workflows das Image aus `devcontainer.json` |
 
@@ -112,11 +113,13 @@ Veröffentlicht eine Version der Anwendung, sobald ein Versions-Tag gepusht wird
 → `./gradlew build -Pversion=…` → `gh release create` mit dem JAR und
 `--generate-notes`.
 
-**Job `deploy`** (nach `release`): Release-JAR herunterladen → `tofu plan`, bei
-Änderungen `tofu apply` → [`deploy.sh`](../.github/scripts/deploy.sh) deployt JAR
-und Web-Konsole nur, wenn ihr Hash von dem auf dem Server abweicht. Secrets
-`AWS_ACCESS_KEY_ID`, `AWS_SECRET_ACCESS_KEY`, `AWS_SESSION_TOKEN`, `SSH_PRIVATE_KEY`.
-Details: [DEPLOYMENT.md](DEPLOYMENT.md).
+**Job `changes`:** vergleicht den Tag mit dem vorherigen Release-Tag
+(`git diff --name-only`) und gibt `backend` / `frontend` aus. **Job `deploy`:** ruft
+[`deploy.yml`](../.github/workflows/deploy.yml) nur mit den geänderten Teilen auf.
+`deploy.yml` lädt die Release-Assets herunter (kein neuer Build) und startet
+[`deploy/backend.sh`](../deploy/backend.sh) bzw. [`deploy/frontend.sh`](../deploy/frontend.sh).
+Secrets `AWS_ACCESS_KEY_ID`, `AWS_SECRET_ACCESS_KEY`, `AWS_SESSION_TOKEN`; Variables
+aus `tofu output`. Details: [deployment.md](deployment.md).
 
 Tags `devcontainer-v*` beginnen nicht mit `v` und lösen dieses Release deshalb nicht aus.
 
@@ -166,7 +169,6 @@ Baut, testet und veröffentlicht das Image aus
 | `docker/login-action` | `v3` | DevContainer |
 | `docker/build-push-action` | `v6` | DevContainer |
 | `peter-evans/create-pull-request` | `v8` | DevContainer |
-| `opentofu/setup-opentofu` | `v1` | Release (`deploy`) |
 
 ### Projekteigene Bausteine
 
@@ -181,9 +183,9 @@ Baut, testet und veröffentlicht das Image aus
 - Jeder Workflow deklariert `permissions` explizit und nach dem Prinzip der minimalen
   Rechte; Schreibrechte haben nur die Jobs, die sie brauchen (`coverage-pages`,
   DevContainer `build` und `bump`, `release`).
-- Ausser im Job `deploy` wird **ausschliesslich das eingebaute `GITHUB_TOKEN`**
-  verwendet; `deploy` braucht die AWS-Credentials und den SSH-Deploy-Key
-  (siehe [DEPLOYMENT.md](DEPLOYMENT.md)).
+- Ausser in `deploy.yml` wird **ausschliesslich das eingebaute `GITHUB_TOKEN`**
+  verwendet; `deploy.yml` braucht die AWS-Credentials des Learner Labs
+  (Secrets-Konzept in [deployment.md](deployment.md)).
 
 ### Einmalige Repository-Einstellungen
 
@@ -200,7 +202,8 @@ Baut, testet und veröffentlicht das Image aus
 |---|---|
 | [COVERAGE.md](COVERAGE.md) | JaCoCo, Design und Umsetzung der Coverage Time-Series, Coverage Gate |
 | [DEVCONTAINER.md](DEVCONTAINER.md) | DevContainer-Image, Versionierungskonzept, Freigabeprozess |
-| [DEPLOYMENT.md](DEPLOYMENT.md) | Web-Konsole, EC2 mit OpenTofu, Release-basiertes Deployment |
+| [webkonsole.md](webkonsole.md) | Web-Konsole, Frontend, Versionsabfrage, lokaler Start |
+| [deployment.md](deployment.md) | Infrastruktur, Deployment, Secrets-Konzept, Reflexion |
 | [TESTKONZEPT.md](TESTKONZEPT.md) | Teststrategie, Testziele und Testfälle, die die CI ausführt |
 | [TESTDOKUMENTATION.md](TESTDOKUMENTATION.md) | GIVEN/WHEN/THEN je Testfall, Testprotokolle |
 

@@ -13,8 +13,9 @@ DevContainer-Image, lokal wie in GitHub Actions.
 java -jar build/libs/tictactoe.jar   # spielen (Mensch gegen GreedyPlayer)
 ```
 
-Im Browser spielen (lokal oder auf EC2, bei jedem Release automatisch deployt):
-siehe [docs/DEPLOYMENT.md](docs/DEPLOYMENT.md).
+**Im Browser spielen: <WEBAPP_URL>**
+(Web-Konsole auf EC2, Frontend auf S3, bei jedem Release automatisch deployt, siehe
+[docs/webkonsole.md](docs/webkonsole.md) und [docs/deployment.md](docs/deployment.md))
 
 | Report | Pfad |
 |---|---|
@@ -78,7 +79,8 @@ src/test/java/ch/bbw/m450/tictactoe/
 | [docs/COVERAGE.md](docs/COVERAGE.md) | JaCoCo-Report, Coverage Verification, Time-Series, Coverage Gate |
 | [docs/MUTATIONTESTING.md](docs/MUTATIONTESTING.md) | PIT: Einrichtung, gefundene Lücken, Ergebnis |
 | [docs/PIPELINES.md](docs/PIPELINES.md) | alle GitHub-Actions-Workflows |
-| [docs/DEPLOYMENT.md](docs/DEPLOYMENT.md) | im Browser spielen: Web-Konsole, EC2 mit OpenTofu, Deployment bei jedem Release |
+| [docs/webkonsole.md](docs/webkonsole.md) | Web-Konsole (ttyd), Frontend, Versionsabfrage, lokal starten |
+| [docs/deployment.md](docs/deployment.md) | Infrastruktur (OpenTofu), Deployment, Secrets-Konzept, Reflexion |
 | [docs/DEVCONTAINER.md](docs/DEVCONTAINER.md) | DevContainer-Image, Versionierung, Continuous Deployment |
 
 ## Hinweise

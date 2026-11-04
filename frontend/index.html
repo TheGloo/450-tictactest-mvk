@@ -1,0 +1,42 @@
+<!doctype html>
+<html lang="de">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>TicTacTest</title>
+  <link rel="stylesheet" href="style.css">
+  <!-- per environment: written by OpenTofu on S3, local default in this folder -->
+  <script src="config.js"></script>
+  <script src="app.js" defer></script>
+</head>
+<body>
+  <header>
+    <h1>TicTacTest</h1>
+    <p class="versions">
+      Frontend <span id="frontend-version">…</span> ·
+      Backend <span id="backend-version">…</span>
+    </p>
+  </header>
+
+  <main>
+    <section class="rules">
+      <h2>So wird gespielt</h2>
+      <ol>
+        <li>Klicke in das Terminal.</li>
+        <li>Du spielst <strong>X</strong> und beginnst. Tippe die Nummer eines freien Feldes
+          (<code>0</code>–<code>8</code>) und drücke <kbd>Enter</kbd>.</li>
+        <li>Der Computer (O) antwortet sofort.</li>
+        <li>Ein besetztes Feld oder eine ungültige Eingabe beendet die Partie.</li>
+        <li>Nach dem Spielende startet <kbd>Enter</kbd> eine neue Partie.</li>
+      </ol>
+      <pre class="board">0  1  2
+3  4  5
+6  7  8</pre>
+    </section>
+
+    <section class="terminal">
+      <iframe id="terminal" title="TicTacTest-Terminal"></iframe>
+    </section>
+  </main>
+</body>
+</html>

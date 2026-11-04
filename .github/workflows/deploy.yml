@@ -1,0 +1,94 @@
+name: Deploy
+
+# Deploys the artifacts of a published release, nothing is built here.
+#  - called by release.yml with only the parts that changed since the previous release
+#  - started by hand (Actions -> Deploy -> Run workflow) for a rollback or after
+#    `tofu destroy` / `tofu apply`: any published version, backend and frontend
+on:
+  workflow_call:
+    inputs:
+      tag:
+        type: string
+        required: true
+      backend:
+        type: boolean
+        required: true
+      frontend:
+        type: boolean
+        required: true
+  workflow_dispatch:
+    inputs:
+      tag:
+        description: Release tag, e.g. v1.2.0
+        type: string
+        required: true
+      backend:
+        description: Deploy backend (jar)
+        type: boolean
+        default: true
+      frontend:
+        description: Deploy frontend
+        type: boolean
+        default: true
+
+permissions:
+  contents: read
+
+jobs:
+  deploy:
+    name: Deploy ${{ inputs.tag }}
+    runs-on: ubuntu-latest
+    # one deployment at a time; a second one waits instead of cancelling the first
+    concurrency:
+      group: deploy
+      cancel-in-progress: false
+    env:
+      AWS_ACCESS_KEY_ID: ${{ secrets.AWS_ACCESS_KEY_ID }}
+      AWS_SECRET_ACCESS_KEY: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+      AWS_SESSION_TOKEN: ${{ secrets.AWS_SESSION_TOKEN }}
+      AWS_REGION: us-east-1
+      # outputs of `tofu apply`, set by deploy/github-vars.sh
+      INSTANCE_ID: ${{ vars.INSTANCE_ID }}
+      ARTIFACT_BUCKET: ${{ vars.ARTIFACT_BUCKET }}
+      FRONTEND_BUCKET: ${{ vars.FRONTEND_BUCKET }}
+      WEB_CONSOLE_URL: ${{ vars.WEB_CONSOLE_URL }}
+      FRONTEND_URL: ${{ vars.FRONTEND_URL }}
+      TAG: ${{ inputs.tag }}
+
+    steps:
+      - uses: actions/checkout@v4
+
+      # Learner Lab credentials expire after the session: fail early and clearly
+      - name: Check AWS credentials
+        run: |
+          if ! aws sts get-caller-identity > /dev/null; then
+            echo "::error::AWS credentials invalid or expired. Update the secrets AWS_ACCESS_KEY_ID, AWS_SECRET_ACCESS_KEY, AWS_SESSION_TOKEN and run this workflow again (Actions -> Deploy -> Run workflow, tag $TAG)."
+            exit 1
+          fi
+
+      - name: Download release assets
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          echo "VERSION=${TAG#v}" >> "$GITHUB_ENV"
+          gh release download "$TAG" --dir dist
+
+      - name: Backend
+        if: inputs.backend
+        run: deploy/backend.sh "$VERSION" "dist/tictactoe-$VERSION.jar"
+
+      - name: Frontend
+        if: inputs.frontend
+        run: deploy/frontend.sh "$VERSION" "dist/tictactest-frontend-$VERSION.zip"
+
+      - name: Summary
+        if: always()
+        run: |
+          {
+            echo "| Teil | $TAG |"
+            echo "|---|---|"
+            echo "| Backend | ${{ inputs.backend && 'deployt' || 'unverändert' }} |"
+            echo "| Frontend | ${{ inputs.frontend && 'deployt' || 'unverändert' }} |"
+            echo
+            echo "Läuft: Backend $(curl -fsS --max-time 5 "${WEB_CONSOLE_URL}version" || echo '?') · Spielen: $FRONTEND_URL"
+          } >> "$GITHUB_STEP_SUMMARY"
