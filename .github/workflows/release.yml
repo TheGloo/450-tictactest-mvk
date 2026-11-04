@@ -55,11 +55,20 @@ jobs:
         run: |
           # the workspace belongs to the runner's UID, not to root in the container
           git config --global --add safe.directory "$GITHUB_WORKSPACE"
-          gh release create "$GITHUB_REF_NAME" \
-            build/libs/*.jar \
-            "build/tictactest-frontend-$VERSION.zip" \
-            --title "$GITHUB_REF_NAME" \
-            --generate-notes
+          # The GitHub API answers 5xx now and then: up to three attempts. A failed attempt
+          # can leave a draft behind (create = draft, upload, publish): remove it first.
+          for attempt in 1 2 3; do
+            while [ "$(gh release view "$GITHUB_REF_NAME" --json isDraft -q .isDraft 2>/dev/null)" = true ]; do
+              gh api -X DELETE "repos/$GITHUB_REPOSITORY/releases/$(gh release view "$GITHUB_REF_NAME" --json databaseId -q .databaseId)"
+            done
+            gh release create "$GITHUB_REF_NAME" \
+              build/libs/*.jar \
+              "build/tictactest-frontend-$VERSION.zip" \
+              --title "$GITHUB_REF_NAME" \
+              --generate-notes && break
+            [ "$attempt" = 3 ] && exit 1
+            sleep 20
+          done
 
   # What changed since the previous release tag? Not the last commit: a release can
   # contain many commits, and a commit on main without a tag is never deployed.
