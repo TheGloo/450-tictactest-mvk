@@ -21,3 +21,12 @@ yarn-error.log*
 
 # Eclipse / VS Code Java compiler output
 bin/
+
+# Web-Konsole: lokal hineinkopierte Jars (webconsole/README.md)
+webconsole/jar/*.jar
+
+# OpenTofu: Zustand und lokale Variablen (infra/README.md)
+*.tfstate
+*.tfstate.*
+*.tfvars
+!*.tfvars.example

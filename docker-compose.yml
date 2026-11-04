@@ -1,0 +1,19 @@
+# Web-Konsole für TicTacTest: http://localhost:8080
+# Start: docker compose up --build    Doku: webconsole/README.md
+# Privates Repo: Release-Jar vorher nach webconsole/jar/ legen (gh release download),
+# sonst scheitert der Download im Build.
+services:
+  webconsole:
+    build:
+      context: ./webconsole
+      args:
+        # Release-Tag, dessen Jar ins Image kommt (Override per Umgebungsvariable)
+        TICTACTEST_VERSION: ${TICTACTEST_VERSION:-v1.0.0}
+        TICTACTEST_REPO: ${TICTACTEST_REPO:-TheGloo/450-tictactest-mvk}
+        JAR_URL: ${JAR_URL:-}
+        JAR_SHA256: ${JAR_SHA256:-}
+    image: tictactest-webconsole:${TICTACTEST_VERSION:-v1.0.0}
+    ports:
+      # nur lokal erreichbar; Auth/TLS folgen erst beim öffentlichen Deployment
+      - "127.0.0.1:8080:7681"
+    restart: unless-stopped

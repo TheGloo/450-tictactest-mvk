@@ -11,6 +11,7 @@ DevContainer-Image, lokal wie in GitHub Actions.
 ./gradlew pitest     # Mutation Testing mit PIT
 ./gradlew test       # nur die Tests
 java -jar build/libs/tictactoe.jar   # spielen (Mensch gegen GreedyPlayer)
+docker compose up --build            # Release-Jar im Browser spielen: http://localhost:8080
 ```
 
 | Report | Pfad |
@@ -76,6 +77,8 @@ src/test/java/ch/bbw/m450/tictactoe/
 | [docs/MUTATIONTESTING.md](docs/MUTATIONTESTING.md) | PIT: Einrichtung, gefundene Lücken, Ergebnis |
 | [docs/PIPELINES.md](docs/PIPELINES.md) | alle GitHub-Actions-Workflows |
 | [docs/DEVCONTAINER.md](docs/DEVCONTAINER.md) | DevContainer-Image, Versionierung, Continuous Deployment |
+| [webconsole/README.md](webconsole/README.md) | Web-Konsole: Release-Jar mit ttyd im Browser spielen |
+| [infra/README.md](infra/README.md) | OpenTofu-Grundgerüst: leere EC2-Instanz |
 
 ## Hinweise
 
