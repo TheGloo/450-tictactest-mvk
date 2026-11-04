@@ -28,15 +28,52 @@ data "aws_iam_instance_profile" "lab" {
   name = "LabInstanceProfile"
 }
 
-# --- artifacts: private bucket, the pipeline uploads the release jar, the instance reads it
+# --- buckets
+# Bucket names are global: a random suffix instead of a fixed name. The resource
+# aws_s3_bucket cannot be used in the Learner Lab: after creating a bucket it reads its
+# object lock configuration, which a service control policy denies (403). The buckets are
+# therefore created and removed with the AWS CLI; everything else about them (public
+# access, policy, website, objects) is managed by the provider as usual.
 
-resource "aws_s3_bucket" "artifacts" {
-  bucket_prefix = "tictactest-artifacts-"
-  force_destroy = true
+resource "random_id" "bucket_suffix" {
+  byte_length = 6
 }
 
+resource "terraform_data" "artifact_bucket" {
+  input = "tictactest-artifacts-${random_id.bucket_suffix.hex}"
+
+  provisioner "local-exec" {
+    command = "aws s3api create-bucket --bucket ${self.input} --region ${var.region}"
+  }
+
+  provisioner "local-exec" {
+    when    = destroy
+    command = "aws s3 rb s3://${self.input} --force"
+  }
+}
+
+resource "terraform_data" "frontend_bucket" {
+  input = "tictactest-frontend-${random_id.bucket_suffix.hex}"
+
+  provisioner "local-exec" {
+    command = "aws s3api create-bucket --bucket ${self.input} --region ${var.region}"
+  }
+
+  provisioner "local-exec" {
+    when    = destroy
+    command = "aws s3 rb s3://${self.input} --force"
+  }
+}
+
+locals {
+  artifact_bucket = terraform_data.artifact_bucket.output
+  frontend_bucket = terraform_data.frontend_bucket.output
+}
+
+# --- artifacts: private bucket, the pipeline uploads the release jar, the instance reads it
+
 resource "aws_s3_bucket_public_access_block" "artifacts" {
-  bucket                  = aws_s3_bucket.artifacts.id
+  bucket                  = local.artifact_bucket
   block_public_acls       = true
   block_public_policy     = true
   ignore_public_acls      = true
@@ -79,7 +116,7 @@ resource "aws_instance" "web" {
   # A change builds a new instance; it installs the last deployed version from S3.
   user_data = templatefile("${path.module}/cloud-init.yaml.tftpl", {
     region          = var.region
-    artifact_bucket = aws_s3_bucket.artifacts.id
+    artifact_bucket = local.artifact_bucket
     ttyd_version    = local.ttyd_version
     ttyd_sha256     = local.ttyd_sha256
     max_players     = var.max_players
@@ -117,13 +154,8 @@ resource "aws_eip" "web" {
 
 # --- frontend: public S3 static website
 
-resource "aws_s3_bucket" "frontend" {
-  bucket_prefix = "tictactest-frontend-"
-  force_destroy = true
-}
-
 resource "aws_s3_bucket_public_access_block" "frontend" {
-  bucket                  = aws_s3_bucket.frontend.id
+  bucket                  = local.frontend_bucket
   block_public_acls       = true
   ignore_public_acls      = true
   block_public_policy     = false
@@ -131,7 +163,7 @@ resource "aws_s3_bucket_public_access_block" "frontend" {
 }
 
 resource "aws_s3_bucket_policy" "frontend" {
-  bucket = aws_s3_bucket.frontend.id
+  bucket = local.frontend_bucket
   policy = jsonencode({
     Version = "2012-10-17"
     Statement = [{
@@ -139,7 +171,7 @@ resource "aws_s3_bucket_policy" "frontend" {
       Effect    = "Allow"
       Principal = "*"
       Action    = "s3:GetObject"
-      Resource  = "${aws_s3_bucket.frontend.arn}/*"
+      Resource  = "arn:aws:s3:::${local.frontend_bucket}/*"
     }]
   })
 
@@ -147,7 +179,7 @@ resource "aws_s3_bucket_policy" "frontend" {
 }
 
 resource "aws_s3_bucket_website_configuration" "frontend" {
-  bucket = aws_s3_bucket.frontend.id
+  bucket = local.frontend_bucket
 
   index_document {
     suffix = "index.html"
@@ -157,7 +189,7 @@ resource "aws_s3_bucket_website_configuration" "frontend" {
 # Only the infrastructure knows the address of the instance, so OpenTofu writes the
 # configuration of the frontend. The frontend deployment excludes this file.
 resource "aws_s3_object" "frontend_config" {
-  bucket        = aws_s3_bucket.frontend.id
+  bucket        = local.frontend_bucket
   key           = "config.js"
   content_type  = "application/javascript"
   cache_control = "no-store"
