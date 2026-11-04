@@ -23,6 +23,7 @@ jar {
 	manifest {
 		attributes 'Main-Class': 'ch.bbw.m450.tictactoe.TicTacToeMain',
 			'Implementation-Title': 'TicTacTest',
+			'Implementation-Vendor': 'BBW M450',
 			'Implementation-Version': project.version
 	}
 }
