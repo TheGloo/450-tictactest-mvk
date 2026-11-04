@@ -13,7 +13,7 @@ DevContainer-Image, lokal wie in GitHub Actions.
 java -jar build/libs/tictactoe.jar   # spielen (Mensch gegen GreedyPlayer)
 ```
 
-**Im Browser spielen: <WEBAPP_URL>**
+**Im Browser spielen: <http://tictactest-frontend-83d63465599e.s3-website-us-east-1.amazonaws.com/>**
 (Web-Konsole auf EC2, Frontend auf S3, bei jedem Release automatisch deployt, siehe
 [docs/webkonsole.md](docs/webkonsole.md) und [docs/deployment.md](docs/deployment.md))
 
