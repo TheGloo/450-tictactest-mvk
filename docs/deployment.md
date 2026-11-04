@@ -173,7 +173,7 @@ Datum setzt (jetzt `unzip -DD`).
 | Experiment | Ergebnis |
 |---|---|
 | **1. Session-Ende** (Instanz gestoppt und gestartet, wie das Learner Lab) | App läuft ohne Zutun wieder, sofort nach `running` erreichbar. **IP gleich** (`54.167.177.48`, Elastic IP), **Version gleich** (`1.2.0`). |
-| **2. Einrichtung ändern** (`chmod`-Fix im cloud-init-Template) | `tofu plan`: `aws_instance.web must be replaced`, `user_data … # forces replacement`, `aws_eip.web will be updated in-place`: `1 to add, 1 to change, 1 to destroy`. Die IP bleibt (die EIP wird umgehängt). Die neue Instanz liest `state/backend-version` aus S3 und installiert dieselbe Version selbst. → Ergebnis des `apply`: siehe unten. |
+| **2. Einrichtung ändern** (`chmod`-Fix im cloud-init-Template) | `tofu plan`: `aws_instance.web must be replaced`, `user_data … # forces replacement`, `aws_eip.web will be updated in-place`: `1 to add, 1 to change, 1 to destroy`. Die IP bleibt (die EIP wird umgehängt). Die neue Instanz liest `state/backend-version` aus S3 und installiert dieselbe Version selbst. **Ergebnis des `apply`:** neue Instanz (`i-06d5…` → `i-0ae2…`), **IP gleich**, im cloud-init-Log `deployed 1.6.0`, `/version` = `1.6.0`, ohne Deployment. Danach `tofu plan`: *No changes*. Die neue Instanz-ID musste mit `deploy/github-vars.sh` in die GitHub Variables. |
 | **3. `tofu destroy` + `tofu apply`** | Neu sind: Elastic IP und damit DNS-Name und URL der Web-Konsole, Instanz-ID, beide Bucket-Namen (neuer Zufallssuffix), Frontend-URL. Die Buckets sind leer, also gibt es auch keine `state/backend-version` mehr. **Bis wieder dieselbe Version läuft:** `deploy/github-vars.sh` (neue Werte in die GitHub Variables), dann *Actions → Deploy → Run workflow* mit dem aktuellen Tag. |
 
 ---
