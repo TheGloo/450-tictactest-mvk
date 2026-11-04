@@ -100,7 +100,11 @@ jobs:
   deploy:
     name: Deploy
     needs: [release, changes]
-    if: needs.changes.outputs.backend == 'true' || needs.changes.outputs.frontend == 'true'
+    # without the GitHub Variables of the infrastructure (deploy/github-vars.sh) there is
+    # no target yet: the release is published, the deployment is done by hand
+    if: >-
+      vars.INSTANCE_ID != '' &&
+      (needs.changes.outputs.backend == 'true' || needs.changes.outputs.frontend == 'true')
     uses: ./.github/workflows/deploy.yml
     with:
       tag: ${{ github.ref_name }}
