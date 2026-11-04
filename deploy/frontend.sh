@@ -11,7 +11,9 @@ zip=$2
 site=$(mktemp -d)
 trap 'rm -rf "$site"' EXIT
 
-unzip -q "$zip" -d "$site"
+# -DD: no timestamps from the archive. `s3 sync` uploads only files that differ in size
+# or are newer; version.json of 1.1.0 and 1.2.0 have the same size and an old date.
+unzip -q -DD "$zip" -d "$site"
 
 # --delete removes files the new release no longer has; config.js belongs to the
 # infrastructure (written by OpenTofu) and is neither uploaded nor deleted

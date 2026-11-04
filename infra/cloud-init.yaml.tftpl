@@ -71,6 +71,8 @@ write_files:
       dir=/opt/tictactest/releases/$version
       tmp=$(mktemp -d)
       trap 'rm -rf "$tmp"' EXIT
+      # mktemp creates the directory for root only, the smoke test runs as tictactest
+      chmod 755 "$tmp"
 
       aws s3 cp --only-show-errors "s3://$bucket/releases/$version/tictactoe.jar" "$tmp/tictactoe.jar"
       chmod 644 "$tmp/tictactoe.jar"
