@@ -12,7 +12,7 @@ Stand **25.10.2026**. Beschrieben ist der IST-Zustand der Dateien unter
 |---|---|---|---|---|
 | 1 | **CI** | [`ci.yml`](../.github/workflows/ci.yml) | Push auf jeden Branch, PR auf `main`, manuell | Build + Tests + Coverage + Mutation Testing; Artefakte `coverage-report`, `test-report`, `tictactoe-jar`, `mutation-report`; auf `main` zusätzlich die Coverage Time-Series auf GitHub Pages |
 | 2 | **Coverage Gate** | [`coverage-gate.yml`](../.github/workflows/coverage-gate.yml) | PR auf `main` geöffnet/aktualisiert, manuell | PASS/FAIL: Coverage des Branches ≥ Coverage von `main` |
-| 3 | **Release** | [`release.yml`](../.github/workflows/release.yml) | Push eines Tags `v*` | GitHub Release mit angehängtem JAR |
+| 3 | **Release** | [`release.yml`](../.github/workflows/release.yml) | Push eines Tags `v*` | GitHub Release mit angehängtem JAR, danach Deployment der geänderten Teile auf EC2 |
 | 4 | **DevContainer** | [`devcontainer.yml`](../.github/workflows/devcontainer.yml) | Änderung am Image (PR, `main`), Tag `devcontainer-v*` | getestetes Image; bei einem Tag: veröffentlichte Version in GHCR + Pull Request, der sie einsetzt |
 | – | *DevContainer image reference* | [`devcontainer-ref.yml`](../.github/workflows/devcontainer-ref.yml) | nur `workflow_call` | liefert den übrigen Workflows das Image aus `devcontainer.json` |
 
@@ -112,6 +112,12 @@ Veröffentlicht eine Version der Anwendung, sobald ein Versions-Tag gepusht wird
 → `./gradlew build -Pversion=…` → `gh release create` mit dem JAR und
 `--generate-notes`.
 
+**Job `deploy`** (nach `release`): Release-JAR herunterladen → `tofu plan`, bei
+Änderungen `tofu apply` → [`deploy.sh`](../.github/scripts/deploy.sh) deployt JAR
+und Web-Konsole nur, wenn ihr Hash von dem auf dem Server abweicht. Secrets
+`AWS_ACCESS_KEY_ID`, `AWS_SECRET_ACCESS_KEY`, `AWS_SESSION_TOKEN`, `SSH_PRIVATE_KEY`.
+Details: [DEPLOYMENT.md](DEPLOYMENT.md).
+
 Tags `devcontainer-v*` beginnen nicht mit `v` und lösen dieses Release deshalb nicht aus.
 
 ---
@@ -160,6 +166,7 @@ Baut, testet und veröffentlicht das Image aus
 | `docker/login-action` | `v3` | DevContainer |
 | `docker/build-push-action` | `v6` | DevContainer |
 | `peter-evans/create-pull-request` | `v8` | DevContainer |
+| `opentofu/setup-opentofu` | `v1` | Release (`deploy`) |
 
 ### Projekteigene Bausteine
 
@@ -174,8 +181,9 @@ Baut, testet und veröffentlicht das Image aus
 - Jeder Workflow deklariert `permissions` explizit und nach dem Prinzip der minimalen
   Rechte; Schreibrechte haben nur die Jobs, die sie brauchen (`coverage-pages`,
   DevContainer `build` und `bump`, `release`).
-- Es wird **ausschliesslich das eingebaute `GITHUB_TOKEN`** verwendet, es sind keine
-  eigenen Secrets hinterlegt.
+- Ausser im Job `deploy` wird **ausschliesslich das eingebaute `GITHUB_TOKEN`**
+  verwendet; `deploy` braucht die AWS-Credentials und den SSH-Deploy-Key
+  (siehe [DEPLOYMENT.md](DEPLOYMENT.md)).
 
 ### Einmalige Repository-Einstellungen
 
@@ -192,6 +200,7 @@ Baut, testet und veröffentlicht das Image aus
 |---|---|
 | [COVERAGE.md](COVERAGE.md) | JaCoCo, Design und Umsetzung der Coverage Time-Series, Coverage Gate |
 | [DEVCONTAINER.md](DEVCONTAINER.md) | DevContainer-Image, Versionierungskonzept, Freigabeprozess |
+| [DEPLOYMENT.md](DEPLOYMENT.md) | Web-Konsole, EC2 mit OpenTofu, Release-basiertes Deployment |
 | [TESTKONZEPT.md](TESTKONZEPT.md) | Teststrategie, Testziele und Testfälle, die die CI ausführt |
 | [TESTDOKUMENTATION.md](TESTDOKUMENTATION.md) | GIVEN/WHEN/THEN je Testfall, Testprotokolle |
 

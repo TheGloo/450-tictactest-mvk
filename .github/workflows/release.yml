@@ -48,3 +48,60 @@ jobs:
             build/libs/*.jar \
             --title "$GITHUB_REF_NAME" \
             --generate-notes
+
+  # Deploys the release to EC2, each part only if it differs from what runs there:
+  # infrastructure (tofu plan), jar and web console (hash on the server, deploy.sh).
+  deploy:
+    name: Deploy changed parts to EC2
+    needs: release
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+    # one deployment at a time, a second release waits instead of cancelling
+    concurrency:
+      group: deploy
+      cancel-in-progress: false
+    env:
+      AWS_ACCESS_KEY_ID: ${{ secrets.AWS_ACCESS_KEY_ID }}
+      AWS_SECRET_ACCESS_KEY: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+      AWS_SESSION_TOKEN: ${{ secrets.AWS_SESSION_TOKEN }}
+      AWS_REGION: us-east-1
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: opentofu/setup-opentofu@v1
+        with:
+          tofu_version: 1.13.1
+          tofu_wrapper: false
+
+      # exactly the jar that is attached to the release, not a new build
+      - name: Download release jar
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: gh release download "$GITHUB_REF_NAME" --pattern '*.jar' --dir dist
+
+      - name: Infrastructure
+        working-directory: infra
+        run: |
+          printf '| Teil | Ergebnis |\n|---|---|\n' >> "$GITHUB_STEP_SUMMARY"
+          tofu init -input=false
+          # exit code 0: nothing to do, 2: changes, anything else: error
+          code=0
+          tofu plan -input=false -detailed-exitcode -out=tfplan || code=$?
+          case $code in
+            0) echo "| infra | unverändert, übersprungen |" >> "$GITHUB_STEP_SUMMARY" ;;
+            2) tofu apply -input=false tfplan
+               echo "| infra | geändert, \`tofu apply\` |" >> "$GITHUB_STEP_SUMMARY" ;;
+            *) exit "$code" ;;
+          esac
+          echo "HOST=$(tofu output -raw public_ip)" >> "$GITHUB_ENV"
+
+      - name: Jar and web console
+        env:
+          SSH_PRIVATE_KEY: ${{ secrets.SSH_PRIVATE_KEY }}
+        run: |
+          install -m 600 /dev/null "$RUNNER_TEMP/deploy_key"
+          echo "$SSH_PRIVATE_KEY" > "$RUNNER_TEMP/deploy_key"
+          SSH_KEY="$RUNNER_TEMP/deploy_key" .github/scripts/deploy.sh "$HOST" dist/*.jar
+          echo "**TicTacTest:** http://$HOST/" >> "$GITHUB_STEP_SUMMARY"

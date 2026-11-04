@@ -21,3 +21,7 @@ yarn-error.log*
 
 # Eclipse / VS Code Java compiler output
 bin/
+webconsole/app/
+infra/.terraform/
+infra/*.tfstate*
+infra/tfplan

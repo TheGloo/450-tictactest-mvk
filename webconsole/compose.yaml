@@ -1,0 +1,18 @@
+# Local:  copy the release jar to webconsole/app/tictactoe.jar, then
+#         docker compose -f webconsole/compose.yaml up --build   ->  http://localhost:8080
+# EC2:    the same file in /opt/tictactest with WEB_PORT=80 (see .github/scripts/deploy.sh)
+services:
+  webconsole:
+    build: .
+    image: tictactest-webconsole
+    ports:
+      - "${WEB_PORT:-8080}:7681"
+    volumes:
+      # directory, not the file: the deploy replaces the jar with `mv`, running games keep the old one
+      - ./app:/app:ro
+    restart: unless-stopped
+    read_only: true
+    tmpfs:
+      - /tmp
+    security_opt:
+      - no-new-privileges:true
