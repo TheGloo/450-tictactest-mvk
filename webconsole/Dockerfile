@@ -40,6 +40,13 @@ RUN set -eu; \
 	elif [ "$jar_count" -eq 1 ]; then \
 		local_jar="$(find /tmp/jar -maxdepth 1 -name '*.jar')"; \
 		echo "Using local jar: $local_jar"; \
+		echo "WARNING: local jar in webconsole/jar/ takes precedence over TICTACTEST_VERSION=${TICTACTEST_VERSION} and JAR_URL" >&2; \
+		if [ -n "$JAR_URL" ]; then \
+			echo "WARNING: JAR_URL is ignored: $JAR_URL" >&2; \
+		fi; \
+		if [ "$(basename "$local_jar")" != "tictactoe-${TICTACTEST_VERSION#v}.jar" ]; then \
+			echo "WARNING: $(basename "$local_jar") does not match TICTACTEST_VERSION=${TICTACTEST_VERSION} (expected tictactoe-${TICTACTEST_VERSION#v}.jar); the image tag may not match its jar" >&2; \
+		fi; \
 		cp "$local_jar" /app/tictactest.jar; \
 	else \
 		url="${JAR_URL:-https://github.com/${TICTACTEST_REPO}/releases/download/${TICTACTEST_VERSION}/tictactoe-${TICTACTEST_VERSION#v}.jar}"; \

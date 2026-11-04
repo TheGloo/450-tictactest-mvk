@@ -87,7 +87,9 @@ nicht ins Image und nicht ins Repo. Stattdessen:
 
 **Lokale Datei:** Liegt genau ein Jar in `webconsole/jar/`, wird diese Datei
 verwendet (siehe [Start](#start)). Die Build-Args für Repo, Version und `JAR_URL`
-werden dann ignoriert. Für den Download im Build `webconsole/jar/*.jar` wieder
+werden dann ignoriert. Der Build gibt dazu eine `WARNING` aus, ebenso, wenn der
+Dateiname nicht zu `TICTACTEST_VERSION` passt (erwartet `tictactoe-<Version ohne v>.jar`),
+damit kein veraltetes Jar unbemerkt im Image landet. Für den Download im Build `webconsole/jar/*.jar` wieder
 löschen. Die Datei wird nicht committet (`.gitignore`).
 
 **Eigene URL:** `JAR_URL` überschreibt die Release-URL:
