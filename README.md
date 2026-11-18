@@ -81,6 +81,8 @@ src/test/java/ch/bbw/m450/tictactoe/
 | [docs/PIPELINES.md](docs/PIPELINES.md) | alle GitHub-Actions-Workflows |
 | [docs/webkonsole.md](docs/webkonsole.md) | Web-Konsole (ttyd), Frontend, Versionsabfrage, lokal starten |
 | [docs/deployment.md](docs/deployment.md) | Infrastruktur (OpenTofu), Deployment, Secrets-Konzept, Reflexion |
+| [RELEASE.md](RELEASE.md) | Release- und Versionierungskonzept, Ablauf eines Releases, Rollback |
+| [CHANGELOG.md](CHANGELOG.md) | Änderungen pro Version |
 | [docs/DEVCONTAINER.md](docs/DEVCONTAINER.md) | DevContainer-Image, Versionierung, Continuous Deployment |
 
 ## Hinweise
