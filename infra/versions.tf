@@ -16,7 +16,7 @@ terraform {
   # infrastructure. The bucket is created once by hand (docs/deployment.md), it cannot
   # be part of the configuration whose state it stores. use_lockfile: lock without DynamoDB.
   backend "s3" {
-    bucket       = "tictactest-tfstate-730335265764"
+    bucket       = "tictactest-tfstate-471112545731"
     key          = "tictactest/terraform.tfstate"
     region       = "us-east-1"
     use_lockfile = true

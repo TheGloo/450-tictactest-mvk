@@ -1,6 +1,6 @@
 # Deployment – TicTacTest in der Cloud (Aufträge 2 und 3)
 
-**Spielen:** <http://tictactest-frontend-83d63465599e.s3-website-us-east-1.amazonaws.com/>
+**Spielen:** <http://tictactest-frontend-c42148c2098d.s3-website-us-east-1.amazonaws.com/>
 
 Web-Konsole und Frontend: siehe [webkonsole.md](webkonsole.md) (Auftrag 1).
 
@@ -110,7 +110,7 @@ Eine **neu erstellte** Instanz installiert sie im letzten Schritt von cloud-init
 | 1 GB RAM | `-Xmx32m`, `--max-clients 10` (gemessen ~45 MB pro Partie, siehe webkonsole.md) |
 | Bucket-Namen global | zufälliger Suffix (`random_id`) statt fester Name |
 | **`aws_s3_bucket` scheitert** | Nach dem Anlegen liest der Provider die Object-Lock-Konfiguration. Eine Service Control Policy verbietet `s3:GetBucketObjectLockConfiguration` (403), mit Provider 6 und 5. Die Buckets legt deshalb `terraform_data` mit der AWS CLI an und löscht sie bei `destroy` (`aws s3 rb --force`). Alles andere am Bucket verwaltet der Provider normal. |
-| Schulnetz blockiert HTTP auf rohe IPs (403 des Webfilters) | Alle URLs nutzen den DNS-Namen der Elastic IP (`ec2-54-167-177-48.compute-1.amazonaws.com`) |
+| Schulnetz blockiert HTTP auf rohe IPs (403 des Webfilters) | Alle URLs nutzen den DNS-Namen der Elastic IP (`ec2-3-227-73-125.compute-1.amazonaws.com`) |
 
 ### Outputs
 
@@ -121,15 +121,15 @@ Eine **neu erstellte** Instanz installiert sie im letzten Schritt von cloud-init
 | `deploy_env` | nein, die obigen Werte als `export`-Zeilen für ein manuelles Deployment |
 
 Vertraulich sind nur die AWS-Credentials. Sie sind kein Output und liegen nirgends im Repo.
-Der **State** in S3 (`tictactest-tfstate-730335265764`, versioniert, Lock per
+Der **State** in S3 (`tictactest-tfstate-471112545731`, versioniert, Lock per
 `use_lockfile`) enthält keine Secrets, ist aber trotzdem nicht öffentlich.
 
 ### Einmalig einrichten
 
 ```bash
 # Credentials: Learner Lab -> AWS Details -> AWS CLI  ->  ~/.aws/credentials
-aws s3api create-bucket --bucket tictactest-tfstate-730335265764 --region us-east-1
-aws s3api put-bucket-versioning --bucket tictactest-tfstate-730335265764 \
+aws s3api create-bucket --bucket tictactest-tfstate-471112545731 --region us-east-1
+aws s3api put-bucket-versioning --bucket tictactest-tfstate-471112545731 \
   --versioning-configuration Status=Enabled
 
 cd infra
@@ -174,7 +174,26 @@ Datum setzt (jetzt `unzip -DD`).
 |---|---|
 | **1. Session-Ende** (Instanz gestoppt und gestartet, wie das Learner Lab) | App läuft ohne Zutun wieder, sofort nach `running` erreichbar. **IP gleich** (`54.167.177.48`, Elastic IP), **Version gleich** (`1.2.0`). |
 | **2. Einrichtung ändern** (`chmod`-Fix im cloud-init-Template) | `tofu plan`: `aws_instance.web must be replaced`, `user_data … # forces replacement`, `aws_eip.web will be updated in-place`: `1 to add, 1 to change, 1 to destroy`. Die IP bleibt (die EIP wird umgehängt). Die neue Instanz liest `state/backend-version` aus S3 und installiert dieselbe Version selbst. **Ergebnis des `apply`:** neue Instanz (`i-06d5…` → `i-0ae2…`), **IP gleich**, im cloud-init-Log `deployed 1.6.0`, `/version` = `1.6.0`, ohne Deployment. Danach `tofu plan`: *No changes*. Die neue Instanz-ID musste mit `deploy/github-vars.sh` in die GitHub Variables. |
-| **3. `tofu destroy` + `tofu apply`** | Neu sind: Elastic IP und damit DNS-Name und URL der Web-Konsole, Instanz-ID, beide Bucket-Namen (neuer Zufallssuffix), Frontend-URL. Die Buckets sind leer, also gibt es auch keine `state/backend-version` mehr. **Bis wieder dieselbe Version läuft:** `deploy/github-vars.sh` (neue Werte in die GitHub Variables), dann *Actions → Deploy → Run workflow* mit dem aktuellen Tag. |
+| **3. `tofu destroy` + `tofu apply`** | Neu sind: Elastic IP und damit DNS-Name und URL der Web-Konsole, Instanz-ID, beide Bucket-Namen (neuer Zufallssuffix), Frontend-URL. Die Buckets sind leer, also gibt es auch keine `state/backend-version` mehr. **Bis wieder dieselbe Version läuft:** `deploy/github-vars.sh` (neue Werte in die GitHub Variables), dann *Actions → Deploy → Run workflow* mit dem aktuellen Tag. **In echt durchgespielt** beim Umzug in ein neues Learner Lab, siehe unten. |
+
+### Umzug in ein neues Learner Lab (25.11.2026)
+
+Das alte Lab (Konto `730335265764`) musste durch ein neues ersetzt werden (Konto
+`471112545731`). Das entspricht Experiment 3, nur noch härter: Auch der State-Bucket war weg.
+Der ganze Wiederaufbau aus dem Repo:
+
+| Schritt | Ergebnis |
+|---|---|
+| Credentials in `~/.aws/credentials`, `aws sts get-caller-identity` | neues Konto, `LabInstanceProfile` vorhanden |
+| State-Bucket `tictactest-tfstate-471112545731` anlegen (siehe oben), Name in [`infra/versions.tf`](../infra/versions.tf) anpassen, `tofu init -reconfigure` | leerer State |
+| `tofu plan -out=tfplan` → `tofu apply tfplan` | `13 to add, 0 to change, 0 to destroy`, alles in unter 30 s angelegt |
+| `deploy/frontend.sh 1.6.0 …`, `deploy/backend.sh 1.6.0 …` mit den Assets des **bestehenden** Releases `v1.6.0` | Frontend `1.6.0`, Backend `1.6.0`, `state/backend-version` = `1.6.0`, im Browser spielbar |
+| `deploy/github-vars.sh`, AWS-Secrets in GitHub erneuern | Pipeline zeigt auf die neue Infrastruktur |
+
+Neu sind alle Namen (Konto, Instanz `i-0322d374f2896055e`, Elastic IP `3.227.73.125`, Buckets
+mit Suffix `c42148c2098d`, Frontend-URL). Nichts musste neu gebaut werden: Die Releases auf
+GitHub sind die einzige Quelle der Artefakte, die Infrastruktur entsteht vollständig aus
+`infra/`.
 
 ---
 
